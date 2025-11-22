@@ -1,8 +1,10 @@
 """Data models for AKLP CLI Agent."""
 
 from datetime import datetime
+from enum import Enum
+from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, computed_field
 
 
 class AnalysisRequest(BaseModel):
@@ -21,29 +23,166 @@ class AnalysisResult(BaseModel):
     shell_command: str = Field(..., description="Shell command to execute")
 
 
-class NoteRequest(BaseModel):
-    """Request model for Note service."""
+# ============== Note Models ==============
 
-    filename: str = Field(..., description="Name of file to create")
-    content: str = Field(..., description="Content of the file")
+
+class NoteCreate(BaseModel):
+    """Request model for creating a note."""
+
+    title: str = Field(..., min_length=1, max_length=255, description="Title of the note")
+    content: str = Field(..., min_length=1, description="Content of the note")
+    session_id: UUID | None = Field(default=None, description="Optional session ID")
+
+
+class NoteUpdate(BaseModel):
+    """Request model for updating a note."""
+
+    title: str | None = Field(default=None, min_length=1, max_length=255, description="Updated title")
+    content: str | None = Field(default=None, min_length=1, description="Updated content")
 
 
 class NoteResponse(BaseModel):
     """Response model from Note service."""
 
-    success: bool = Field(..., description="Whether file creation succeeded")
-    message: str = Field(..., description="Success or error message")
-    filepath: str | None = Field(None, description="Path to created file")
+    id: UUID
+    session_id: UUID | None
+    title: str
+    content: str
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
 
 
-class TaskRequest(BaseModel):
-    """Request model for Task service."""
+class NoteListResponse(BaseModel):
+    """Paginated note list response."""
 
-    command: str = Field(..., description="Shell command to execute")
+    items: list[NoteResponse]
+    total: int = Field(description="Total number of notes")
+    page: int = Field(ge=1, description="Current page number")
+    limit: int = Field(ge=1, description="Number of items per page")
+
+    @computed_field
+    @property
+    def total_pages(self) -> int:
+        """Calculate total number of pages."""
+        return (self.total + self.limit - 1) // self.limit if self.total > 0 else 1
+
+    @computed_field
+    @property
+    def has_next(self) -> bool:
+        """Check if there is a next page."""
+        return self.page < self.total_pages
+
+    @computed_field
+    @property
+    def has_prev(self) -> bool:
+        """Check if there is a previous page."""
+        return self.page > 1
+
+
+# ============== Task Models ==============
+
+
+class TaskStatus(str, Enum):
+    """Task status enumeration."""
+
+    PENDING = "pending"
+    IN_PROGRESS = "in_progress"
+    COMPLETED = "completed"
+
+
+class TaskPriority(str, Enum):
+    """Task priority enumeration."""
+
+    HIGH = "high"
+    MEDIUM = "medium"
+    LOW = "low"
+
+
+class TaskCreate(BaseModel):
+    """Request model for creating a task."""
+
+    title: str = Field(..., min_length=1, max_length=255, description="Task title")
+    description: str | None = Field(default=None, max_length=1000, description="Task description")
+    status: TaskStatus = Field(default=TaskStatus.PENDING, description="Task status")
+    priority: TaskPriority | None = Field(default=None, description="Task priority")
+    due_date: datetime | None = Field(default=None, description="Task due date")
+    session_id: UUID | None = Field(default=None, description="AI session ID")
+
+
+class TaskUpdate(BaseModel):
+    """Request model for updating a task."""
+
+    title: str | None = Field(default=None, min_length=1, max_length=255, description="Task title")
+    description: str | None = Field(default=None, max_length=1000, description="Task description")
+    status: TaskStatus | None = Field(default=None, description="Task status")
+    priority: TaskPriority | None = Field(default=None, description="Task priority")
+    due_date: datetime | None = Field(default=None, description="Task due date")
 
 
 class TaskResponse(BaseModel):
     """Response model from Task service."""
+
+    id: UUID
+    session_id: UUID | None
+    title: str
+    description: str | None
+    status: TaskStatus
+    priority: TaskPriority | None
+    due_date: datetime | None
+    completed_at: datetime | None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class TaskListResponse(BaseModel):
+    """Paginated task list response."""
+
+    items: list[TaskResponse]
+    total: int = Field(description="Total number of tasks")
+    page: int = Field(ge=1, description="Current page number")
+    limit: int = Field(ge=1, description="Number of items per page")
+
+    @computed_field
+    @property
+    def total_pages(self) -> int:
+        """Calculate total number of pages."""
+        return (self.total + self.limit - 1) // self.limit if self.total > 0 else 1
+
+    @computed_field
+    @property
+    def has_next(self) -> bool:
+        """Check if there is a next page."""
+        return self.page < self.total_pages
+
+    @computed_field
+    @property
+    def has_prev(self) -> bool:
+        """Check if there is a previous page."""
+        return self.page > 1
+
+
+# ============== Legacy Models (for backward compatibility) ==============
+
+
+class LegacyNoteRequest(BaseModel):
+    """Legacy request model for Note service (for old CLI workflow)."""
+
+    filename: str = Field(..., description="Name of file to create")
+    content: str = Field(..., description="Content of the file")
+
+
+class LegacyTaskRequest(BaseModel):
+    """Legacy request model for Task service (for old CLI workflow)."""
+
+    command: str = Field(..., description="Shell command to execute")
+
+
+class LegacyTaskResponse(BaseModel):
+    """Legacy response model from Task service (for old CLI workflow)."""
 
     success: bool = Field(..., description="Whether command execution succeeded")
     stdout: str = Field(default="", description="Standard output")

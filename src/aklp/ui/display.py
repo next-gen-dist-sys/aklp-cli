@@ -12,7 +12,7 @@ from rich.syntax import Syntax
 from rich.table import Table
 from rich.text import Text
 
-from aklp.models import AnalysisResult, ConversationTurn, TaskResponse
+from aklp.models import AnalysisResult, ConversationTurn, LegacyTaskResponse
 
 console = Console()
 
@@ -147,7 +147,7 @@ def display_error(message: str) -> None:
     )
 
 
-def display_task_result(result: TaskResponse) -> None:
+def display_task_result(result: LegacyTaskResponse) -> None:
     """Display task execution result.
 
     Args:

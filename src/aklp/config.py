@@ -17,16 +17,16 @@ class Settings(BaseSettings):
     )
 
     llm_service_url: HttpUrl = Field(
-        ...,
+        default="http://localhost:8001",
         description="Base URL for LLM analysis service",
     )
     note_service_url: HttpUrl = Field(
-        ...,
-        description="Base URL for Note file creation service",
+        default="http://localhost:8002",
+        description="Base URL for Note service (aklp-note)",
     )
     task_service_url: HttpUrl = Field(
-        ...,
-        description="Base URL for Task command execution service",
+        default="http://localhost:8003",
+        description="Base URL for Task service (aklp-task)",
     )
 
 
@@ -37,4 +37,4 @@ def get_settings() -> Settings:
     Returns:
         Settings: Application configuration instance
     """
-    return Settings()  # type: ignore[call-arg]
+    return Settings()

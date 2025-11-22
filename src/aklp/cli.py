@@ -10,12 +10,14 @@ from pydantic import ValidationError
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
+from aklp.commands.note import note_app
+from aklp.commands.task import task_app
 from aklp.config import get_settings
 from aklp.history import HistoryManager
 from aklp.models import ConversationTurn
 from aklp.services.llm import LLMServiceError, analyze_prompt
-from aklp.services.note import NoteServiceError, create_file
-from aklp.services.task import TaskServiceError, execute_command
+from aklp.services.note import NoteServiceError, create_note
+from aklp.services.task import TaskServiceError
 from aklp.ui.display import (
     confirm_execution,
     display_analysis_result,
@@ -27,7 +29,6 @@ from aklp.ui.display import (
     display_history,
     display_history_cleared,
     display_success,
-    display_task_result,
     display_turn_separator,
     display_welcome_message,
     get_user_input,
@@ -38,6 +39,10 @@ app = typer.Typer(
     help="MSA CLI Agent - Automate tasks with natural language",
     add_completion=False,
 )
+
+# Register subcommands
+app.add_typer(note_app, name="note")
+app.add_typer(task_app, name="task")
 console = Console()
 
 
@@ -102,34 +107,19 @@ async def process_user_request(
             TextColumn("[progress.description]{task.description}"),
             console=console,
         ) as progress:
-            task1 = progress.add_task("파일 생성 중...", total=1)
+            task1 = progress.add_task("노트 생성 중...", total=1)
 
-            note_response = await create_file(
-                filename=analysis_result.filename,
+            # Create note using the new CRUD API
+            note_response = await create_note(
+                title=analysis_result.filename,
                 content=analysis_result.file_content,
             )
 
-            turn.note_response = note_response
-
-            if note_response.success:
-                display_success(
-                    f"파일 생성 완료: {note_response.filepath or analysis_result.filename}"
-                )
-            else:
-                display_error(f"파일 생성 실패: {note_response.message}")
-                turn.error = note_response.message
-                return turn
-
             progress.update(task1, completed=1)
 
-            task2 = progress.add_task("명령어 실행 중...", total=1)
-
-            task_response = await execute_command(analysis_result.shell_command)
-            turn.task_response = task_response
-
-            progress.update(task2, completed=1)
-
-        display_task_result(task_response)
+        display_success(f"노트 생성 완료: {note_response.title} (ID: {note_response.id})")
+        console.print(f"\n[dim]명령어 실행 기능은 제거되었습니다.[/dim]")
+        console.print(f"[dim]제안된 명령어: {analysis_result.shell_command}[/dim]")
 
     except LLMServiceError as e:
         error_msg = f"LLM 서비스 오류: {str(e)}"
