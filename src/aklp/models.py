@@ -7,14 +7,38 @@ from uuid import UUID
 from pydantic import BaseModel, Field, computed_field
 
 
+# ============== Agent Models ==============
+
+
+class AgentRequest(BaseModel):
+    """Request model for Agent service."""
+
+    session_id: UUID | None = Field(default=None, description="Session ID (optional)")
+    raw_command: str = Field(..., description="User's natural language command")
+
+
+class AgentResponse(BaseModel):
+    """Response model from Agent service."""
+
+    session_id: UUID | None = Field(default=None, description="Session ID")
+    success: bool = Field(..., description="Whether command generation succeeded")
+    command: str | None = Field(default=None, description="Generated kubectl command")
+    reason: str | None = Field(default=None, description="Reason for the command")
+    title: str | None = Field(default=None, description="Brief summary/title")
+    error_message: str | None = Field(default=None, description="Error message if failed")
+
+
+# ============== Legacy Analysis Models (for backward compatibility) ==============
+
+
 class AnalysisRequest(BaseModel):
-    """Request model for LLM analysis."""
+    """Request model for LLM analysis (legacy)."""
 
     prompt: str = Field(..., description="User's natural language request")
 
 
 class AnalysisResult(BaseModel):
-    """Response model from LLM service analysis."""
+    """Response model from LLM service analysis (legacy)."""
 
     title: str = Field(..., description="Task title")
     description: str = Field(..., description="Detailed description in markdown")

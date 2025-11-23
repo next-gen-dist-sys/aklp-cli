@@ -16,9 +16,9 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    llm_service_url: HttpUrl = Field(
+    agent_service_url: HttpUrl = Field(
         default="http://localhost:8001",
-        description="Base URL for LLM analysis service",
+        description="Base URL for Agent service (aklp-agent)",
     )
     note_service_url: HttpUrl = Field(
         default="http://localhost:8002",

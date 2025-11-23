@@ -75,11 +75,11 @@ def create(
 @note_app.command("list")
 def list_cmd(
     page: Annotated[int, typer.Option("--page", "-p", help="페이지 번호")] = 1,
-    limit: Annotated[int, typer.Option("--limit", "-l", help="페이지당 항목 수")] = 10,
+    session_id: Annotated[str | None, typer.Option("--session", "-s", help="세션 ID로 필터링")] = None,
 ) -> None:
     """노트 목록을 조회합니다."""
     try:
-        result = asyncio.run(list_notes(page=page, limit=limit))
+        result = asyncio.run(list_notes(page=page, session_id=session_id))
         if not result.items:
             console.print("[yellow]노트가 없습니다.[/yellow]")
             return

@@ -38,7 +38,8 @@ async def _make_request(
         NoteServiceError: If the service call fails
     """
     settings = get_settings()
-    url = f"{settings.note_service_url}/api/v1{endpoint}"
+    base_url = str(settings.note_service_url).rstrip("/")
+    url = f"{base_url}/api/v1{endpoint}"
 
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
@@ -95,13 +96,13 @@ async def create_note(
 
 async def list_notes(
     page: int = 1,
-    limit: int = 10,
+    session_id: str | None = None,
 ) -> NoteListResponse:
     """List notes with pagination.
 
     Args:
         page: Page number (default: 1)
-        limit: Items per page (default: 10)
+        session_id: Optional session ID filter
 
     Returns:
         NoteListResponse: Paginated list of notes
@@ -109,7 +110,9 @@ async def list_notes(
     Raises:
         NoteServiceError: If the service call fails
     """
-    params = {"page": page, "limit": limit}
+    params: dict = {"page": page}
+    if session_id:
+        params["session_id"] = session_id
     data = await _make_request("GET", "/notes", params=params)
     return NoteListResponse.model_validate(data)
 

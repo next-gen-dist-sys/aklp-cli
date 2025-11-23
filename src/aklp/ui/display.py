@@ -1,5 +1,11 @@
 """Rich UI components for beautiful terminal output."""
 
+from pathlib import Path
+
+from prompt_toolkit import PromptSession
+from prompt_toolkit.completion import WordCompleter
+from prompt_toolkit.history import FileHistory
+from prompt_toolkit.styles import Style as PTStyle
 from rich.align import Align
 from rich.console import Console
 from rich.layout import Layout
@@ -12,25 +18,102 @@ from rich.syntax import Syntax
 from rich.table import Table
 from rich.text import Text
 
-from aklp.models import AnalysisResult, ConversationTurn, LegacyTaskResponse
+from aklp.models import AgentResponse, AnalysisResult, ConversationTurn, LegacyTaskResponse, NoteResponse, TaskResponse
 
 console = Console()
 
-# Modern color palette
+# prompt_toolkit 설정
+_history_file = Path.home() / ".aklp_input_history"
+_command_completer = WordCompleter(
+    ["/help", "/history", "/clear", "/exit", "/quit", "/notes", "/note", "/tasks", "/task"],
+    ignore_case=True,
+)
+_prompt_style = PTStyle.from_dict({
+    "prompt": "ansiblue bold",
+})
+
+# PromptSession 초기화 (방향키 히스토리, 한글 입력, 백스페이스 완벽 지원)
+_prompt_session: PromptSession[str] | None = None
+
+
+def _get_prompt_session() -> PromptSession[str]:
+    """Get or create the prompt session (lazy initialization)."""
+    global _prompt_session
+    if _prompt_session is None:
+        _prompt_session = PromptSession(
+            history=FileHistory(str(_history_file)),
+            completer=_command_completer,
+            complete_while_typing=True,
+            enable_history_search=True,
+        )
+    return _prompt_session
+
+# Color palette (works well on both light and dark themes)
 COLORS = {
-    "primary": "bright_blue",
-    "secondary": "bright_magenta",
-    "success": "bright_green",
-    "warning": "bright_yellow",
-    "error": "bright_red",
-    "info": "bright_cyan",
-    "muted": "bright_black",
+    "primary": "blue",
+    "secondary": "magenta",
+    "success": "green",
+    "warning": "dark_orange",
+    "error": "red",
+    "info": "cyan",
+    "muted": "grey50",  # Medium gray works on both light and dark themes
     "accent": "magenta",
+    "text": "default",  # Use terminal default for body text
 }
 
 
+def display_agent_result(result: AgentResponse) -> None:
+    """Display the Agent service result with rich formatting.
+
+    Args:
+        result: Response from Agent service
+    """
+    console.print()
+
+    if not result.success:
+        # Error case
+        console.print(
+            Panel(
+                f"[{COLORS['error']}]{result.error_message or '알 수 없는 오류'}[/{COLORS['error']}]",
+                title=f"[{COLORS['error']}]Agent 오류[/{COLORS['error']}]",
+                border_style=COLORS["error"],
+                padding=(1, 2),
+            )
+        )
+        return
+
+    # Build unified content
+    content = Text()
+
+    # Title
+    content.append("✨ ", style=COLORS["accent"])
+    content.append(result.title or "명령어 생성 완료", style=f"bold {COLORS['primary']}")
+    content.append(" ✨\n", style=COLORS["accent"])
+
+    # Reason section
+    if result.reason:
+        content.append("\n")
+        content.append("📋 설명\n", style=f"bold {COLORS['info']}")
+        content.append(f"{result.reason}\n", style="")
+
+    # Command section
+    if result.command:
+        content.append("\n")
+        content.append("⚡ 명령어\n", style=f"bold {COLORS['warning']}")
+        content.append(result.command, style="bold")
+
+    console.print(
+        Panel(
+            content,
+            border_style=COLORS["primary"],
+            padding=(1, 2),
+        )
+    )
+    console.print()
+
+
 def display_analysis_result(result: AnalysisResult) -> None:
-    """Display the LLM analysis result with rich formatting.
+    """Display the LLM analysis result with rich formatting (legacy).
 
     Args:
         result: Analysis result from LLM service
@@ -72,7 +155,7 @@ def display_analysis_result(result: AnalysisResult) -> None:
     syntax = Syntax(
         result.file_content,
         "markdown",
-        theme="monokai",
+        theme="ansi_light",
         line_numbers=True,
         background_color="default",
     )
@@ -92,7 +175,7 @@ def display_analysis_result(result: AnalysisResult) -> None:
     cmd_syntax = Syntax(
         result.shell_command,
         "bash",
-        theme="monokai",
+        theme="ansi_light",
         background_color="default",
     )
 
@@ -106,6 +189,44 @@ def display_analysis_result(result: AnalysisResult) -> None:
         )
     )
     console.print()
+
+
+def display_execution_result(note: NoteResponse | None, task: TaskResponse | None) -> None:
+    """Display Note and Task creation results.
+
+    Args:
+        note: Created note response (optional)
+        task: Created task response (optional)
+    """
+    if not note and not task:
+        return
+
+    console.print()
+
+    content = Text()
+    content.append("✅ 생성 완료\n", style=f"bold {COLORS['success']}")
+
+    if note:
+        content.append("\n")
+        content.append("📝 노트: ", style=COLORS["muted"])
+        content.append(f"{note.title}\n", style="")
+        content.append("   ID: ", style=COLORS["muted"])
+        content.append(f"{note.id}", style=COLORS["info"])
+
+    if task:
+        content.append("\n")
+        content.append("☑️  태스크: ", style=COLORS["muted"])
+        content.append(f"{task.title}\n", style="")
+        content.append("   ID: ", style=COLORS["muted"])
+        content.append(f"{task.id}", style=COLORS["info"])
+
+    console.print(
+        Panel(
+            content,
+            border_style=COLORS["success"],
+            padding=(1, 2),
+        )
+    )
 
 
 def confirm_execution() -> bool:
@@ -235,13 +356,13 @@ def display_welcome_message() -> None:
     # Commands table
     commands_text = Text()
     commands_text.append("💡 명령어\n", style=f"bold {COLORS['info']}")
-    commands_text.append("  /help      ", style=f"bold {COLORS['secondary']}")
+    commands_text.append("  /help       ", style=f"bold {COLORS['secondary']}")
     commands_text.append("도움말 보기\n", style="")
-    commands_text.append("  /history   ", style=f"bold {COLORS['secondary']}")
-    commands_text.append("세션 히스토리 보기\n", style="")
-    commands_text.append("  /clear     ", style=f"bold {COLORS['secondary']}")
-    commands_text.append("히스토리 초기화\n", style="")
-    commands_text.append("  /exit      ", style=f"bold {COLORS['secondary']}")
+    commands_text.append("  /notes      ", style=f"bold {COLORS['secondary']}")
+    commands_text.append("노트 목록 조회\n", style="")
+    commands_text.append("  /tasks      ", style=f"bold {COLORS['secondary']}")
+    commands_text.append("작업 목록 조회\n", style="")
+    commands_text.append("  /exit       ", style=f"bold {COLORS['secondary']}")
     commands_text.append("종료", style="")
 
     welcome_text.append_text(commands_text)
@@ -270,17 +391,51 @@ def display_goodbye_message() -> None:
     console.print()
 
 
-def get_user_input() -> str | None:
-    """Get user input from REPL prompt.
+async def get_user_input_async() -> str | None:
+    """Get user input from REPL prompt (async version).
+
+    Uses prompt_toolkit for better input handling:
+    - Arrow keys: Navigate input history (↑/↓) and cursor (←/→)
+    - Backspace/Delete: Proper character deletion
+    - Korean/Unicode: Full support for multi-byte characters
+    - Tab: Auto-complete commands (/help, /exit, etc.)
+    - Ctrl+R: Reverse history search
+    - Emacs-style shortcuts: Ctrl+A/E/K/U/W
 
     Returns:
         User input string, or None if EOF (Ctrl+D)
     """
     try:
         console.print()
-        return Prompt.ask(
-            f"[{COLORS['primary']}]❯[/{COLORS['primary']}]",
-            console=console,
+        session = _get_prompt_session()
+        return await session.prompt_async(
+            [("class:prompt", "❯ ")],
+            style=_prompt_style,
+        )
+    except (EOFError, KeyboardInterrupt):
+        return None
+
+
+def get_user_input() -> str | None:
+    """Get user input from REPL prompt (sync version).
+
+    Uses prompt_toolkit for better input handling:
+    - Arrow keys: Navigate input history (↑/↓) and cursor (←/→)
+    - Backspace/Delete: Proper character deletion
+    - Korean/Unicode: Full support for multi-byte characters
+    - Tab: Auto-complete commands (/help, /exit, etc.)
+    - Ctrl+R: Reverse history search
+    - Emacs-style shortcuts: Ctrl+A/E/K/U/W
+
+    Returns:
+        User input string, or None if EOF (Ctrl+D)
+    """
+    try:
+        console.print()
+        session = _get_prompt_session()
+        return session.prompt(
+            [("class:prompt", "❯ ")],
+            style=_prompt_style,
         )
     except (EOFError, KeyboardInterrupt):
         return None
@@ -320,11 +475,27 @@ def display_help() -> None:
     help_text.append("  /quit      ", style=f"bold {COLORS['secondary']}")
     help_text.append("REPL 모드 종료\n\n", style="")
 
+    help_text.append("조회 명령어\n", style=f"bold {COLORS['info']}")
+    help_text.append("  /notes [page]    ", style=f"bold {COLORS['secondary']}")
+    help_text.append("노트 목록 조회\n", style="")
+    help_text.append("  /note <id>       ", style=f"bold {COLORS['secondary']}")
+    help_text.append("특정 노트 조회\n", style="")
+    help_text.append("  /tasks [page]    ", style=f"bold {COLORS['secondary']}")
+    help_text.append("작업 목록 조회\n", style="")
+    help_text.append("  /task <id>       ", style=f"bold {COLORS['secondary']}")
+    help_text.append("특정 작업 조회\n\n", style="")
+
     help_text.append("단축키\n", style=f"bold {COLORS['success']}")
     help_text.append("  Ctrl+D   ", style=f"bold {COLORS['secondary']}")
     help_text.append("종료\n", style="")
     help_text.append("  Ctrl+C   ", style=f"bold {COLORS['secondary']}")
-    help_text.append("현재 작업 취소", style="")
+    help_text.append("현재 작업 취소\n", style="")
+    help_text.append("  ↑/↓      ", style=f"bold {COLORS['secondary']}")
+    help_text.append("이전/다음 입력 히스토리\n", style="")
+    help_text.append("  Ctrl+R   ", style=f"bold {COLORS['secondary']}")
+    help_text.append("히스토리 검색\n", style="")
+    help_text.append("  Tab      ", style=f"bold {COLORS['secondary']}")
+    help_text.append("명령어 자동완성", style="")
 
     console.print(
         Panel(
@@ -365,7 +536,7 @@ def display_history(turns: list[ConversationTurn]) -> None:
 
     table.add_column("#", style=COLORS["muted"], width=4, justify="right")
     table.add_column("시각", style=COLORS["info"], width=19)
-    table.add_column("요청", style="white", width=45, no_wrap=False)
+    table.add_column("요청", style="default", width=45, no_wrap=False)
     table.add_column("실행", style=COLORS["success"], width=4, justify="center")
     table.add_column("상태", width=10)
 
@@ -410,3 +581,229 @@ def display_history_cleared() -> None:
     """Display message when history is cleared."""
     console.print()
     console.print(f"  [{COLORS['success']}]✓ 히스토리가 초기화되었습니다.[/{COLORS['success']}]")
+
+
+def display_notes_list(notes: list[NoteResponse], total: int, page: int, total_pages: int) -> None:
+    """Display notes in a table format for interactive mode.
+
+    Args:
+        notes: List of notes to display
+        total: Total number of notes
+        page: Current page number
+        total_pages: Total number of pages
+    """
+    console.print()
+
+    if not notes:
+        console.print(
+            Panel(
+                f"[{COLORS['muted']}]노트가 없습니다.[/{COLORS['muted']}]",
+                border_style=COLORS["muted"],
+                padding=(1, 2),
+            )
+        )
+        return
+
+    table = Table(
+        title=f"[bold {COLORS['primary']}]📝 Notes[/bold {COLORS['primary']}] (Page {page}/{total_pages}, Total: {total})",
+        show_header=True,
+        header_style=f"bold {COLORS['primary']}",
+        border_style=COLORS["primary"],
+    )
+    table.add_column("ID", style=COLORS["muted"], max_width=36)
+    table.add_column("제목", style=COLORS["info"])
+    table.add_column("내용", max_width=40)
+    table.add_column("생성일", style=COLORS["muted"])
+
+    for note in notes:
+        content_preview = note.content[:37] + "..." if len(note.content) > 40 else note.content
+        content_preview = content_preview.replace("\n", " ")
+        table.add_row(
+            str(note.id),
+            note.title,
+            content_preview,
+            note.created_at.strftime("%Y-%m-%d %H:%M"),
+        )
+
+    console.print(table)
+
+    if total_pages > 1:
+        console.print()
+        console.print(
+            Align.center(
+                f"[{COLORS['muted']}]페이지 이동: /notes <page>[/{COLORS['muted']}]"
+            )
+        )
+
+
+def display_note_detail(note: NoteResponse) -> None:
+    """Display a single note in detail.
+
+    Args:
+        note: Note to display
+    """
+    console.print()
+
+    content = Text()
+    content.append(f"{note.title}\n\n", style=f"bold {COLORS['primary']}")
+    content.append(note.content, style="")
+    content.append("\n\n", style="")
+    content.append(f"ID: {note.id}\n", style=COLORS["muted"])
+    content.append(f"생성일: {note.created_at.strftime('%Y-%m-%d %H:%M:%S')}\n", style=COLORS["muted"])
+    content.append(f"수정일: {note.updated_at.strftime('%Y-%m-%d %H:%M:%S')}", style=COLORS["muted"])
+    if note.session_id:
+        content.append(f"\n세션 ID: {note.session_id}", style=COLORS["muted"])
+
+    console.print(
+        Panel(
+            content,
+            title=f"[{COLORS['info']}]📝 Note[/{COLORS['info']}]",
+            border_style=COLORS["info"],
+            padding=(1, 2),
+        )
+    )
+
+
+def display_tasks_list(
+    tasks: list[TaskResponse],
+    total: int,
+    page: int,
+    total_pages: int,
+) -> None:
+    """Display tasks in a table format for interactive mode.
+
+    Args:
+        tasks: List of tasks to display
+        total: Total number of tasks
+        page: Current page number
+        total_pages: Total number of pages
+    """
+    from aklp.models import TaskPriority, TaskStatus
+
+    def _status_color(status: TaskStatus) -> str:
+        colors = {
+            TaskStatus.PENDING: "yellow",
+            TaskStatus.IN_PROGRESS: "blue",
+            TaskStatus.COMPLETED: "green",
+        }
+        return colors.get(status, "white")
+
+    def _priority_color(priority: TaskPriority | None) -> str:
+        if priority is None:
+            return COLORS["muted"]
+        colors = {
+            TaskPriority.HIGH: "red",
+            TaskPriority.MEDIUM: "yellow",
+            TaskPriority.LOW: "green",
+        }
+        return colors.get(priority, "white")
+
+    console.print()
+
+    if not tasks:
+        console.print(
+            Panel(
+                f"[{COLORS['muted']}]작업이 없습니다.[/{COLORS['muted']}]",
+                border_style=COLORS["muted"],
+                padding=(1, 2),
+            )
+        )
+        return
+
+    table = Table(
+        title=f"[bold {COLORS['warning']}]☑️  Tasks[/bold {COLORS['warning']}] (Page {page}/{total_pages}, Total: {total})",
+        show_header=True,
+        header_style=f"bold {COLORS['warning']}",
+        border_style=COLORS["warning"],
+    )
+    table.add_column("ID", style=COLORS["muted"], max_width=36)
+    table.add_column("제목", style=COLORS["info"])
+    table.add_column("상태")
+    table.add_column("우선순위")
+    table.add_column("마감일", style=COLORS["muted"])
+
+    for task in tasks:
+        status_color = _status_color(task.status)
+        priority_str = task.priority.value if task.priority else "-"
+        priority_color = _priority_color(task.priority)
+        due_date_str = task.due_date.strftime("%Y-%m-%d") if task.due_date else "-"
+
+        table.add_row(
+            str(task.id),
+            task.title,
+            f"[{status_color}]{task.status.value}[/{status_color}]",
+            f"[{priority_color}]{priority_str}[/{priority_color}]",
+            due_date_str,
+        )
+
+    console.print(table)
+
+    if total_pages > 1:
+        console.print()
+        console.print(
+            Align.center(
+                f"[{COLORS['muted']}]페이지 이동: /tasks <page>[/{COLORS['muted']}]"
+            )
+        )
+
+
+def display_task_detail(task: TaskResponse) -> None:
+    """Display a single task in detail.
+
+    Args:
+        task: Task to display
+    """
+    from aklp.models import TaskPriority, TaskStatus
+
+    def _status_color(status: TaskStatus) -> str:
+        colors = {
+            TaskStatus.PENDING: "yellow",
+            TaskStatus.IN_PROGRESS: "blue",
+            TaskStatus.COMPLETED: "green",
+        }
+        return colors.get(status, "white")
+
+    def _priority_color(priority: TaskPriority | None) -> str:
+        if priority is None:
+            return COLORS["muted"]
+        colors = {
+            TaskPriority.HIGH: "red",
+            TaskPriority.MEDIUM: "yellow",
+            TaskPriority.LOW: "green",
+        }
+        return colors.get(priority, "white")
+
+    console.print()
+
+    status_color = _status_color(task.status)
+    priority_str = task.priority.value if task.priority else "없음"
+    priority_color = _priority_color(task.priority)
+
+    content = Text()
+    content.append(f"{task.title}\n\n", style=f"bold {COLORS['warning']}")
+
+    if task.description:
+        content.append(f"{task.description}\n\n", style="")
+
+    content.append("상태: ", style=COLORS["muted"])
+    content.append(f"{task.status.value}\n", style=status_color)
+    content.append("우선순위: ", style=COLORS["muted"])
+    content.append(f"{priority_str}\n", style=priority_color)
+
+    if task.due_date:
+        content.append(f"마감일: {task.due_date.strftime('%Y-%m-%d %H:%M')}\n", style=COLORS["muted"])
+    if task.completed_at:
+        content.append(f"완료일: {task.completed_at.strftime('%Y-%m-%d %H:%M')}\n", style=COLORS["success"])
+
+    content.append(f"\nID: {task.id}\n", style=COLORS["muted"])
+    content.append(f"생성일: {task.created_at.strftime('%Y-%m-%d %H:%M:%S')}\n", style=COLORS["muted"])
+    content.append(f"수정일: {task.updated_at.strftime('%Y-%m-%d %H:%M:%S')}", style=COLORS["muted"])
+
+    console.print(
+        Panel(
+            content,
+            title=f"[{COLORS['warning']}]☑️  Task[/{COLORS['warning']}]",
+            border_style=COLORS["warning"],
+            padding=(1, 2),
+        )
+    )

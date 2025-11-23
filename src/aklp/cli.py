@@ -4,6 +4,7 @@ import asyncio
 import sys
 import time
 from typing import Annotated
+from uuid import UUID
 
 import typer
 from pydantic import ValidationError
@@ -14,24 +15,28 @@ from aklp.commands.note import note_app
 from aklp.commands.task import task_app
 from aklp.config import get_settings
 from aklp.history import HistoryManager
-from aklp.models import ConversationTurn
-from aklp.services.llm import LLMServiceError, analyze_prompt
-from aklp.services.note import NoteServiceError, create_note
-from aklp.services.task import TaskServiceError
+from aklp.models import AgentResponse, ConversationTurn
+from aklp.services.agent import AgentServiceError, execute_command
+from aklp.services.note import NoteServiceError, create_note, get_note, list_notes
+from aklp.services.task import TaskServiceError, create_task, get_task, list_tasks
 from aklp.ui.display import (
     confirm_execution,
-    display_analysis_result,
+    display_agent_result,
     display_cancellation_message,
     display_completion_message,
     display_error,
+    display_execution_result,
     display_goodbye_message,
     display_help,
     display_history,
     display_history_cleared,
-    display_success,
+    display_note_detail,
+    display_notes_list,
+    display_task_detail,
+    display_tasks_list,
     display_turn_separator,
     display_welcome_message,
-    get_user_input,
+    get_user_input_async,
 )
 
 app = typer.Typer(
@@ -55,14 +60,14 @@ def validate_configuration() -> bool:
     try:
         settings = get_settings()
         console.print("[dim]서비스 연결 정보:[/dim]")
-        console.print(f"[dim]  • LLM: {settings.llm_service_url}[/dim]")
+        console.print(f"[dim]  • Agent: {settings.agent_service_url}[/dim]")
         console.print(f"[dim]  • Note: {settings.note_service_url}[/dim]")
         console.print(f"[dim]  • Task: {settings.task_service_url}[/dim]")
         return True
     except ValidationError:
         display_error("환경 설정 오류")
         console.print("\n필요한 환경 변수가 설정되지 않았습니다:")
-        console.print("  • LLM_SERVICE_URL")
+        console.print("  • AGENT_SERVICE_URL")
         console.print("  • NOTE_SERVICE_URL")
         console.print("  • TASK_SERVICE_URL")
         console.print("\n.env 파일을 생성하거나 환경 변수를 설정해주세요.")
@@ -76,6 +81,14 @@ async def process_user_request(
 ) -> ConversationTurn:
     """Process a single user request.
 
+    Flow:
+    1. User input
+    2. Agent service call
+    3. Display result
+    4. User yes/no confirmation
+    5. Note + Task service call
+    6. Display result
+
     Args:
         prompt: User's natural language request
         history_manager: Optional history manager to record turn
@@ -86,15 +99,23 @@ async def process_user_request(
     turn = ConversationTurn(user_prompt=prompt)
 
     try:
+        # Step 1-2: Call Agent service
         with console.status(
-            "[bold green]AI가 요청을 분석하고 있습니다...[/bold green]",
+            "[bold green]Agent가 요청을 분석하고 있습니다...[/bold green]",
             spinner="dots",
         ):
-            analysis_result = await analyze_prompt(prompt)
+            agent_response: AgentResponse = await execute_command(prompt)
 
-        turn.analysis = analysis_result
-        display_analysis_result(analysis_result)
+        # Step 3: Display Agent result
+        display_agent_result(agent_response)
 
+        # Check if agent returned an error
+        if not agent_response.success:
+            turn.error = agent_response.error_message
+            turn.executed = False
+            return turn
+
+        # Step 4: User confirmation
         if not confirm_execution():
             display_cancellation_message()
             turn.executed = False
@@ -102,27 +123,38 @@ async def process_user_request(
 
         turn.executed = True
 
+        # Step 5: Create Note and Task
+        note_response = None
+        task_response = None
+
         with Progress(
             SpinnerColumn(),
             TextColumn("[progress.description]{task.description}"),
             console=console,
         ) as progress:
-            task1 = progress.add_task("노트 생성 중...", total=1)
-
-            # Create note using the new CRUD API
+            # Create Note
+            note_task = progress.add_task("노트 생성 중...", total=1)
             note_response = await create_note(
-                title=analysis_result.filename,
-                content=analysis_result.file_content,
+                title=agent_response.title or "Agent 결과",
+                content=f"## 명령어\n```bash\n{agent_response.command}\n```\n\n## 설명\n{agent_response.reason or ''}",
             )
+            progress.update(note_task, completed=1)
+            turn.note_response = note_response
 
-            progress.update(task1, completed=1)
+            # Create Task
+            task_task = progress.add_task("태스크 생성 중...", total=1)
+            task_response = await create_task(
+                title=agent_response.title or "실행 태스크",
+                description=f"명령어: {agent_response.command}\n\n{agent_response.reason or ''}",
+            )
+            progress.update(task_task, completed=1)
+            turn.task_response = task_response
 
-        display_success(f"노트 생성 완료: {note_response.title} (ID: {note_response.id})")
-        console.print(f"\n[dim]명령어 실행 기능은 제거되었습니다.[/dim]")
-        console.print(f"[dim]제안된 명령어: {analysis_result.shell_command}[/dim]")
+        # Step 6: Display results
+        display_execution_result(note_response, task_response)
 
-    except LLMServiceError as e:
-        error_msg = f"LLM 서비스 오류: {str(e)}"
+    except AgentServiceError as e:
+        error_msg = f"Agent 서비스 오류: {str(e)}"
         display_error(error_msg)
         turn.error = error_msg
     except NoteServiceError as e:
@@ -145,8 +177,9 @@ async def process_user_request(
     return turn
 
 
-@app.command()
+@app.callback(invoke_without_command=True)
 def main(
+    ctx: typer.Context,
     prompt: Annotated[
         str | None,
         typer.Argument(
@@ -154,14 +187,19 @@ def main(
         ),
     ] = None,
 ) -> None:
-    """Process user's natural language request.
+    """MSA CLI Agent - Automate tasks with natural language.
 
     If no prompt is provided, starts interactive REPL mode.
     If a prompt is provided, executes it once and exits.
 
     Args:
+        ctx: Typer context
         prompt: Natural language request from user (optional)
     """
+    # If a subcommand is invoked, skip main logic
+    if ctx.invoked_subcommand is not None:
+        return
+
     if not validate_configuration():
         raise typer.Exit(code=1)
 
@@ -195,6 +233,108 @@ async def single_shot_mode(prompt: str) -> None:
         raise typer.Exit(code=0)
 
 
+async def handle_notes_command(user_input: str) -> None:
+    """Handle /notes [page] command.
+
+    Args:
+        user_input: User input string starting with /notes
+    """
+    parts = user_input.split()
+    page = 1
+    if len(parts) > 1:
+        try:
+            page = int(parts[1])
+            if page < 1:
+                page = 1
+        except ValueError:
+            display_error("페이지 번호는 숫자여야 합니다. 예: /notes 2")
+            return
+
+    try:
+        with console.status("[bold green]노트 목록 조회 중...[/bold green]", spinner="dots"):
+            result = await list_notes(page=page)
+        display_notes_list(result.items, result.total, result.page, result.total_pages)
+    except NoteServiceError as e:
+        display_error(f"Note 서비스 오류: {e}")
+
+
+async def handle_note_command(user_input: str) -> None:
+    """Handle /note <id> command.
+
+    Args:
+        user_input: User input string starting with /note
+    """
+    parts = user_input.split()
+    if len(parts) < 2:
+        display_error("노트 ID를 입력해주세요. 예: /note <uuid>")
+        return
+
+    note_id_str = parts[1]
+    try:
+        note_id = UUID(note_id_str)
+    except ValueError:
+        display_error(f"유효하지 않은 UUID 형식입니다: {note_id_str}")
+        return
+
+    try:
+        with console.status("[bold green]노트 조회 중...[/bold green]", spinner="dots"):
+            note = await get_note(note_id)
+        display_note_detail(note)
+    except NoteServiceError as e:
+        display_error(f"Note 서비스 오류: {e}")
+
+
+async def handle_tasks_command(user_input: str) -> None:
+    """Handle /tasks [page] command.
+
+    Args:
+        user_input: User input string starting with /tasks
+    """
+    parts = user_input.split()
+    page = 1
+    if len(parts) > 1:
+        try:
+            page = int(parts[1])
+            if page < 1:
+                page = 1
+        except ValueError:
+            display_error("페이지 번호는 숫자여야 합니다. 예: /tasks 2")
+            return
+
+    try:
+        with console.status("[bold green]작업 목록 조회 중...[/bold green]", spinner="dots"):
+            result = await list_tasks(page=page)
+        display_tasks_list(result.items, result.total, result.page, result.total_pages)
+    except TaskServiceError as e:
+        display_error(f"Task 서비스 오류: {e}")
+
+
+async def handle_task_command(user_input: str) -> None:
+    """Handle /task <id> command.
+
+    Args:
+        user_input: User input string starting with /task
+    """
+    parts = user_input.split()
+    if len(parts) < 2:
+        display_error("작업 ID를 입력해주세요. 예: /task <uuid>")
+        return
+
+    task_id_str = parts[1]
+    try:
+        task_id = UUID(task_id_str)
+    except ValueError:
+        display_error(f"유효하지 않은 UUID 형식입니다: {task_id_str}")
+        return
+
+    try:
+        with console.status("[bold green]작업 조회 중...[/bold green]", spinner="dots"):
+            task = await get_task(task_id)
+        display_task_detail(task)
+    except TaskServiceError as e:
+        display_error(f"Task 서비스 오류: {e}")
+
+
 async def interactive_mode() -> None:
     """Start interactive REPL mode."""
     display_welcome_message()
@@ -203,7 +343,7 @@ async def interactive_mode() -> None:
 
     try:
         while True:
-            user_input = get_user_input()
+            user_input = await get_user_input_async()
 
             if user_input is None:
                 break
@@ -227,6 +367,26 @@ async def interactive_mode() -> None:
             if user_input.lower() == "/clear":
                 history_manager.clear_history()
                 display_history_cleared()
+                continue
+
+            # /notes [page] - List notes
+            if user_input.lower().startswith("/notes"):
+                await handle_notes_command(user_input)
+                continue
+
+            # /note <id> - Get single note
+            if user_input.lower().startswith("/note "):
+                await handle_note_command(user_input)
+                continue
+
+            # /tasks [page] - List tasks
+            if user_input.lower().startswith("/tasks"):
+                await handle_tasks_command(user_input)
+                continue
+
+            # /task <id> - Get single task
+            if user_input.lower().startswith("/task "):
+                await handle_task_command(user_input)
                 continue
 
             start_time = time.time()

@@ -46,7 +46,8 @@ async def _make_request(
         TaskServiceError: If the service call fails
     """
     settings = get_settings()
-    url = f"{settings.task_service_url}/api/v1{endpoint}"
+    base_url = str(settings.task_service_url).rstrip("/")
+    url = f"{base_url}/api/v1{endpoint}"
 
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
