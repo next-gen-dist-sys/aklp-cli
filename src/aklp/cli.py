@@ -200,6 +200,15 @@ def main(
     if ctx.invoked_subcommand is not None:
         return
 
+    # First-time setup: check for API key
+    from aklp.secrets import ConfigManager
+    from aklp.setup import run_first_time_setup
+
+    config_mgr = ConfigManager()
+    if not config_mgr.has_api_key():
+        if not run_first_time_setup():
+            raise typer.Exit(code=1)
+
     if not validate_configuration():
         raise typer.Exit(code=1)
 
