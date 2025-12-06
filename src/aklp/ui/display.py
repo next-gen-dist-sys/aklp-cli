@@ -18,14 +18,14 @@ from rich.syntax import Syntax
 from rich.table import Table
 from rich.text import Text
 
-from aklp.models import AgentResponse, AnalysisResult, ConversationTurn, LegacyTaskResponse, NoteResponse, TaskResponse
+from aklp.models import AgentResponse, AnalysisResult, BatchResponse, ConversationTurn, FileResponse, LegacyTaskResponse, NoteResponse, TaskResponse, UsageStats
 
 console = Console()
 
 # prompt_toolkit 설정
 _history_file = Path.home() / ".aklp_input_history"
 _command_completer = WordCompleter(
-    ["/help", "/history", "/clear", "/exit", "/quit", "/notes", "/note", "/tasks", "/task"],
+    ["/help", "/history", "/clear", "/exit", "/quit", "/notes", "/note", "/tasks", "/task", "/files", "/file", "/batches", "/batch", "/usage"],
     ignore_case=True,
 )
 _prompt_style = PTStyle.from_dict({
@@ -483,7 +483,17 @@ def display_help() -> None:
     help_text.append("  /tasks [page]    ", style=f"bold {COLORS['secondary']}")
     help_text.append("작업 목록 조회\n", style="")
     help_text.append("  /task <id>       ", style=f"bold {COLORS['secondary']}")
-    help_text.append("특정 작업 조회\n\n", style="")
+    help_text.append("특정 작업 조회\n", style="")
+    help_text.append("  /files [page]    ", style=f"bold {COLORS['secondary']}")
+    help_text.append("파일 목록 조회\n", style="")
+    help_text.append("  /file <id>       ", style=f"bold {COLORS['secondary']}")
+    help_text.append("특정 파일 조회\n", style="")
+    help_text.append("  /batches [page]  ", style=f"bold {COLORS['secondary']}")
+    help_text.append("배치 목록 조회\n", style="")
+    help_text.append("  /batch <id>      ", style=f"bold {COLORS['secondary']}")
+    help_text.append("특정 배치 조회\n", style="")
+    help_text.append("  /usage [period]  ", style=f"bold {COLORS['secondary']}")
+    help_text.append("API 사용량 조회 (today/month/all)\n\n", style="")
 
     help_text.append("단축키\n", style=f"bold {COLORS['success']}")
     help_text.append("  Ctrl+D   ", style=f"bold {COLORS['secondary']}")
@@ -807,3 +817,257 @@ def display_task_detail(task: TaskResponse) -> None:
             padding=(1, 2),
         )
     )
+
+
+def display_usage_stats(stats: UsageStats) -> None:
+    """Display API usage statistics.
+
+    Args:
+        stats: Usage statistics to display
+    """
+    period_labels = {
+        "today": "오늘",
+        "month": "이번 달",
+        "all": "전체",
+    }
+    period_label = period_labels.get(stats.period, stats.period)
+
+    console.print()
+
+    table = Table(
+        title=f"[bold {COLORS['info']}]OpenAI API 사용량 ({period_label})[/bold {COLORS['info']}]",
+        show_header=True,
+        header_style=f"bold {COLORS['info']}",
+        border_style=COLORS["info"],
+    )
+    table.add_column("항목", style=COLORS["muted"])
+    table.add_column("값", justify="right")
+
+    table.add_row("Input Tokens", f"[{COLORS['text']}]{stats.total_input_tokens:,}[/{COLORS['text']}]")
+    table.add_row("Output Tokens", f"[{COLORS['text']}]{stats.total_output_tokens:,}[/{COLORS['text']}]")
+    table.add_row("Cached Tokens", f"[{COLORS['text']}]{stats.total_cached_tokens:,}[/{COLORS['text']}]")
+    table.add_row("요청 수", f"[{COLORS['text']}]{stats.request_count:,}[/{COLORS['text']}]")
+    table.add_row("총 비용", f"[bold {COLORS['success']}]${stats.total_cost_usd:.6f}[/bold {COLORS['success']}]")
+
+    console.print(table)
+
+    # Period info
+    if stats.period_start:
+        console.print()
+        console.print(
+            f"[{COLORS['muted']}]기간: {stats.period_start.strftime('%Y-%m-%d %H:%M')} UTC ~[/{COLORS['muted']}]"
+        )
+
+
+def display_files_list(
+    files: list[FileResponse],
+    total: int,
+    page: int,
+    total_pages: int,
+) -> None:
+    """Display files in a table format for interactive mode.
+
+    Args:
+        files: List of files to display
+        total: Total number of files
+        page: Current page number
+        total_pages: Total number of pages
+    """
+    console.print()
+
+    if not files:
+        console.print(
+            Panel(
+                f"[{COLORS['muted']}]파일이 없습니다.[/{COLORS['muted']}]",
+                border_style=COLORS["muted"],
+                padding=(1, 2),
+            )
+        )
+        return
+
+    table = Table(
+        title=f"[bold {COLORS['secondary']}]📁 Files[/bold {COLORS['secondary']}] (Page {page}/{total_pages}, Total: {total})",
+        show_header=True,
+        header_style=f"bold {COLORS['secondary']}",
+        border_style=COLORS["secondary"],
+    )
+    table.add_column("ID", style=COLORS["muted"], max_width=36)
+    table.add_column("파일명", style=COLORS["info"])
+    table.add_column("타입", max_width=20)
+    table.add_column("크기", justify="right")
+    table.add_column("생성일", style=COLORS["muted"])
+
+    for file in files:
+        table.add_row(
+            str(file.id),
+            file.filename,
+            file.content_type,
+            file.size_human,
+            file.created_at.strftime("%Y-%m-%d %H:%M"),
+        )
+
+    console.print(table)
+
+    if total_pages > 1:
+        console.print()
+        console.print(
+            Align.center(
+                f"[{COLORS['muted']}]페이지 이동: /files <page>[/{COLORS['muted']}]"
+            )
+        )
+
+
+def display_file_detail(file: FileResponse) -> None:
+    """Display a single file in detail.
+
+    Args:
+        file: File to display
+    """
+    console.print()
+
+    content = Text()
+    content.append(f"{file.filename}\n\n", style=f"bold {COLORS['secondary']}")
+
+    content.append("타입: ", style=COLORS["muted"])
+    content.append(f"{file.content_type}\n", style="")
+    content.append("크기: ", style=COLORS["muted"])
+    content.append(f"{file.size_human}\n", style="")
+
+    if file.description:
+        content.append("\n설명: ", style=COLORS["muted"])
+        content.append(f"{file.description}\n", style="")
+
+    content.append(f"\nID: {file.id}\n", style=COLORS["muted"])
+    content.append(f"생성일: {file.created_at.strftime('%Y-%m-%d %H:%M:%S')}\n", style=COLORS["muted"])
+    content.append(f"수정일: {file.updated_at.strftime('%Y-%m-%d %H:%M:%S')}", style=COLORS["muted"])
+    if file.session_id:
+        content.append(f"\n세션 ID: {file.session_id}", style=COLORS["muted"])
+
+    console.print(
+        Panel(
+            content,
+            title=f"[{COLORS['secondary']}]📁 File[/{COLORS['secondary']}]",
+            border_style=COLORS["secondary"],
+            padding=(1, 2),
+        )
+    )
+
+
+def display_batches_list(
+    batches: list[BatchResponse],
+    total: int,
+    page: int,
+    total_pages: int,
+) -> None:
+    """Display batches in a table format for interactive mode.
+
+    Args:
+        batches: List of batches to display
+        total: Total number of batches
+        page: Current page number
+        total_pages: Total number of pages
+    """
+    from aklp.models import TaskStatus
+
+    console.print()
+
+    if not batches:
+        console.print(
+            Panel(
+                f"[{COLORS['muted']}]배치가 없습니다.[/{COLORS['muted']}]",
+                border_style=COLORS["muted"],
+                padding=(1, 2),
+            )
+        )
+        return
+
+    table = Table(
+        title=f"[bold {COLORS['accent']}]📦 Batches[/bold {COLORS['accent']}] (Page {page}/{total_pages}, Total: {total})",
+        show_header=True,
+        header_style=f"bold {COLORS['accent']}",
+        border_style=COLORS["accent"],
+    )
+    table.add_column("ID", style=COLORS["muted"], max_width=36)
+    table.add_column("사유", style=COLORS["info"], max_width=40)
+    table.add_column("태스크", justify="right")
+    table.add_column("생성일", style=COLORS["muted"])
+
+    for batch in batches:
+        reason_preview = (batch.reason[:37] + "...") if batch.reason and len(batch.reason) > 40 else (batch.reason or "-")
+        table.add_row(
+            str(batch.id),
+            reason_preview,
+            str(len(batch.tasks)),
+            batch.created_at.strftime("%Y-%m-%d %H:%M"),
+        )
+
+    console.print(table)
+
+    if total_pages > 1:
+        console.print()
+        console.print(
+            Align.center(
+                f"[{COLORS['muted']}]페이지 이동: /batches <page>[/{COLORS['muted']}]"
+            )
+        )
+
+
+def display_batch_detail(batch: BatchResponse) -> None:
+    """Display a single batch in detail.
+
+    Args:
+        batch: Batch to display
+    """
+    from aklp.models import TaskStatus
+
+    def _status_color(status: TaskStatus) -> str:
+        colors = {
+            TaskStatus.PENDING: "yellow",
+            TaskStatus.IN_PROGRESS: "blue",
+            TaskStatus.COMPLETED: "green",
+        }
+        return colors.get(status, "white")
+
+    console.print()
+
+    content = Text()
+    content.append(f"Batch ID: {batch.id}\n\n", style=f"bold {COLORS['accent']}")
+
+    if batch.reason:
+        content.append("사유: ", style=COLORS["muted"])
+        content.append(f"{batch.reason}\n\n", style="")
+
+    content.append(f"생성일: {batch.created_at.strftime('%Y-%m-%d %H:%M:%S')}\n", style=COLORS["muted"])
+    if batch.session_id:
+        content.append(f"세션 ID: {batch.session_id}", style=COLORS["muted"])
+
+    console.print(
+        Panel(
+            content,
+            title=f"[{COLORS['accent']}]📦 Batch[/{COLORS['accent']}]",
+            border_style=COLORS["accent"],
+            padding=(1, 2),
+        )
+    )
+
+    if batch.tasks:
+        console.print()
+        table = Table(
+            title=f"[bold {COLORS['warning']}]태스크 ({len(batch.tasks)}개)[/bold {COLORS['warning']}]",
+            show_header=True,
+            header_style=f"bold {COLORS['warning']}",
+            border_style=COLORS["warning"],
+        )
+        table.add_column("ID", style=COLORS["muted"], max_width=36)
+        table.add_column("제목", style=COLORS["info"])
+        table.add_column("상태")
+
+        for task in batch.tasks:
+            status_color = _status_color(task.status)
+            table.add_row(
+                str(task.id),
+                task.title,
+                f"[{status_color}]{task.status.value}[/{status_color}]",
+            )
+
+        console.print(table)

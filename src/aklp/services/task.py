@@ -8,6 +8,11 @@ from rich.console import Console
 
 from aklp.config import get_settings
 from aklp.models import (
+    TaskBulkDelete,
+    TaskBulkDeleteResponse,
+    TaskBulkUpdate,
+    TaskBulkUpdateItem,
+    TaskBulkUpdateResponse,
     TaskCreate,
     TaskListResponse,
     TaskPriority,
@@ -119,6 +124,8 @@ async def list_tasks(
     page: int = 1,
     limit: int = 10,
     status: TaskStatus | None = None,
+    session_id: str | None = None,
+    batch_id: str | None = None,
     sort_by: str | None = None,
     sort_order: str = "desc",
 ) -> TaskListResponse:
@@ -128,6 +135,8 @@ async def list_tasks(
         page: Page number (default: 1)
         limit: Items per page (default: 10)
         status: Filter by status (optional)
+        session_id: Filter by session ID (optional)
+        batch_id: Filter by batch ID (optional)
         sort_by: Sort field (optional)
         sort_order: Sort order - asc or desc (default: desc)
 
@@ -137,9 +146,13 @@ async def list_tasks(
     Raises:
         TaskServiceError: If the service call fails
     """
-    params: dict = {"page": page, "limit": limit, "sort_order": sort_order}
+    params: dict = {"page": page, "limit": limit, "order": sort_order}
     if status:
         params["status"] = status.value
+    if session_id:
+        params["session_id"] = session_id
+    if batch_id:
+        params["batch_id"] = batch_id
     if sort_by:
         params["sort_by"] = sort_by
 
@@ -212,3 +225,47 @@ async def delete_task(task_id: UUID) -> None:
         TaskServiceError: If the service call fails
     """
     await _make_request("DELETE", f"/tasks/{task_id}")
+
+
+async def bulk_update_tasks(
+    updates: list[TaskBulkUpdateItem],
+) -> TaskBulkUpdateResponse:
+    """Bulk update multiple tasks.
+
+    Args:
+        updates: List of task updates with IDs
+
+    Returns:
+        TaskBulkUpdateResponse: Updated tasks
+
+    Raises:
+        TaskServiceError: If the service call fails
+    """
+    request_data = TaskBulkUpdate(tasks=updates)
+    data = await _make_request(
+        "PUT",
+        "/tasks/bulk",
+        json_data=request_data.model_dump(exclude_none=True, mode="json"),
+    )
+    return TaskBulkUpdateResponse.model_validate(data)
+
+
+async def bulk_delete_tasks(task_ids: list[UUID]) -> TaskBulkDeleteResponse:
+    """Bulk delete multiple tasks.
+
+    Args:
+        task_ids: List of task UUIDs to delete
+
+    Returns:
+        TaskBulkDeleteResponse: Delete result with count
+
+    Raises:
+        TaskServiceError: If the service call fails
+    """
+    request_data = TaskBulkDelete(ids=task_ids)
+    data = await _make_request(
+        "DELETE",
+        "/tasks/bulk",
+        json_data=request_data.model_dump(mode="json"),
+    )
+    return TaskBulkDeleteResponse.model_validate(data)

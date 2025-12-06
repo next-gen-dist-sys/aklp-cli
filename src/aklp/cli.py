@@ -11,21 +11,32 @@ from pydantic import ValidationError
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
+from aklp.commands.agent import agent_app
+from aklp.commands.batch import batch_app
+from aklp.commands.file import file_app
 from aklp.commands.note import note_app
 from aklp.commands.task import task_app
+from aklp.commands.usage import usage_app
 from aklp.config import get_settings
 from aklp.history import HistoryManager
-from aklp.models import AgentResponse, ConversationTurn
+from aklp.models import AgentResponse, ConversationTurn, UsageStats
 from aklp.services.agent import AgentServiceError, execute_command
+from aklp.services.batch import BatchServiceError, get_batch, list_batches
+from aklp.services.file import FileServiceError, get_file as get_file_metadata, list_files
 from aklp.services.note import NoteServiceError, create_note, get_note, list_notes
 from aklp.services.task import TaskServiceError, create_task, get_task, list_tasks
+from aklp.services.usage import UsageServiceError, get_usage
 from aklp.ui.display import (
     confirm_execution,
     display_agent_result,
+    display_batch_detail,
+    display_batches_list,
     display_cancellation_message,
     display_completion_message,
     display_error,
     display_execution_result,
+    display_file_detail,
+    display_files_list,
     display_goodbye_message,
     display_help,
     display_history,
@@ -35,6 +46,7 @@ from aklp.ui.display import (
     display_task_detail,
     display_tasks_list,
     display_turn_separator,
+    display_usage_stats,
     display_welcome_message,
     get_user_input_async,
 )
@@ -46,8 +58,12 @@ app = typer.Typer(
 )
 
 # Register subcommands
+app.add_typer(agent_app, name="agent")
+app.add_typer(batch_app, name="batch")
+app.add_typer(file_app, name="file")
 app.add_typer(note_app, name="note")
 app.add_typer(task_app, name="task")
+app.add_typer(usage_app, name="usage")
 console = Console()
 
 
@@ -63,6 +79,7 @@ def validate_configuration() -> bool:
         console.print(f"[dim]  • Agent: {settings.agent_service_url}[/dim]")
         console.print(f"[dim]  • Note: {settings.note_service_url}[/dim]")
         console.print(f"[dim]  • Task: {settings.task_service_url}[/dim]")
+        console.print(f"[dim]  • File: {settings.file_service_url}[/dim]")
         return True
     except ValidationError:
         display_error("환경 설정 오류")
@@ -344,6 +361,130 @@ async def handle_task_command(user_input: str) -> None:
         display_error(f"Task 서비스 오류: {e}")
 
 
+async def handle_files_command(user_input: str) -> None:
+    """Handle /files [page] command.
+
+    Args:
+        user_input: User input string starting with /files
+    """
+    parts = user_input.split()
+    page = 1
+    if len(parts) > 1:
+        try:
+            page = int(parts[1])
+            if page < 1:
+                page = 1
+        except ValueError:
+            display_error("페이지 번호는 숫자여야 합니다. 예: /files 2")
+            return
+
+    try:
+        with console.status("[bold green]파일 목록 조회 중...[/bold green]", spinner="dots"):
+            result = await list_files(page=page)
+        display_files_list(result.items, result.total, result.page, result.total_pages)
+    except FileServiceError as e:
+        display_error(f"File 서비스 오류: {e}")
+
+
+async def handle_file_command(user_input: str) -> None:
+    """Handle /file <id> command.
+
+    Args:
+        user_input: User input string starting with /file
+    """
+    parts = user_input.split()
+    if len(parts) < 2:
+        display_error("파일 ID를 입력해주세요. 예: /file <uuid>")
+        return
+
+    file_id_str = parts[1]
+    try:
+        file_id = UUID(file_id_str)
+    except ValueError:
+        display_error(f"유효하지 않은 UUID 형식입니다: {file_id_str}")
+        return
+
+    try:
+        with console.status("[bold green]파일 조회 중...[/bold green]", spinner="dots"):
+            file = await get_file_metadata(file_id)
+        display_file_detail(file)
+    except FileServiceError as e:
+        display_error(f"File 서비스 오류: {e}")
+
+
+async def handle_batches_command(user_input: str) -> None:
+    """Handle /batches [page] command.
+
+    Args:
+        user_input: User input string starting with /batches
+    """
+    parts = user_input.split()
+    page = 1
+    if len(parts) > 1:
+        try:
+            page = int(parts[1])
+            if page < 1:
+                page = 1
+        except ValueError:
+            display_error("페이지 번호는 숫자여야 합니다. 예: /batches 2")
+            return
+
+    try:
+        with console.status("[bold green]배치 목록 조회 중...[/bold green]", spinner="dots"):
+            result = await list_batches(page=page)
+        display_batches_list(result.items, result.total, result.page, result.total_pages)
+    except BatchServiceError as e:
+        display_error(f"Batch 서비스 오류: {e}")
+
+
+async def handle_batch_command(user_input: str) -> None:
+    """Handle /batch <id> command.
+
+    Args:
+        user_input: User input string starting with /batch
+    """
+    parts = user_input.split()
+    if len(parts) < 2:
+        display_error("배치 ID를 입력해주세요. 예: /batch <uuid>")
+        return
+
+    batch_id_str = parts[1]
+    try:
+        batch_id = UUID(batch_id_str)
+    except ValueError:
+        display_error(f"유효하지 않은 UUID 형식입니다: {batch_id_str}")
+        return
+
+    try:
+        with console.status("[bold green]배치 조회 중...[/bold green]", spinner="dots"):
+            batch = await get_batch(batch_id)
+        display_batch_detail(batch)
+    except BatchServiceError as e:
+        display_error(f"Batch 서비스 오류: {e}")
+
+
+async def handle_usage_command(user_input: str) -> None:
+    """Handle /usage [today|month|all] command.
+
+    Args:
+        user_input: User input string starting with /usage
+    """
+    parts = user_input.split()
+    period = "all"
+    if len(parts) > 1 and parts[1] in ("today", "month", "all"):
+        period = parts[1]
+
+    try:
+        with console.status("[bold green]사용량 조회 중...[/bold green]", spinner="dots"):
+            result = await get_usage(period=period)
+        stats = UsageStats.model_validate(result["data"])
+        display_usage_stats(stats)
+    except UsageServiceError as e:
+        display_error(f"사용량 조회 오류: {e}")
+    except Exception as e:
+        display_error(f"예상치 못한 오류: {e}")
+
+
 async def interactive_mode() -> None:
     """Start interactive REPL mode."""
     display_welcome_message()
@@ -396,6 +537,31 @@ async def interactive_mode() -> None:
             # /task <id> - Get single task
             if user_input.lower().startswith("/task "):
                 await handle_task_command(user_input)
+                continue
+
+            # /files [page] - List files
+            if user_input.lower().startswith("/files"):
+                await handle_files_command(user_input)
+                continue
+
+            # /file <id> - Get single file
+            if user_input.lower().startswith("/file "):
+                await handle_file_command(user_input)
+                continue
+
+            # /batches [page] - List batches
+            if user_input.lower().startswith("/batches"):
+                await handle_batches_command(user_input)
+                continue
+
+            # /batch <id> - Get single batch
+            if user_input.lower().startswith("/batch "):
+                await handle_batch_command(user_input)
+                continue
+
+            # /usage [today|month|all] - Get API usage statistics
+            if user_input.lower().startswith("/usage"):
+                await handle_usage_command(user_input)
                 continue
 
             start_time = time.time()

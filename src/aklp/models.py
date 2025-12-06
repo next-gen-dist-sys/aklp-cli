@@ -1,6 +1,7 @@
 """Data models for AKLP CLI Agent."""
 
 from datetime import datetime
+from decimal import Decimal
 from enum import Enum
 from uuid import UUID
 
@@ -150,6 +151,7 @@ class TaskResponse(BaseModel):
 
     id: UUID
     session_id: UUID | None
+    batch_id: UUID | None = None
     title: str
     description: str | None
     status: TaskStatus
@@ -167,6 +169,156 @@ class TaskListResponse(BaseModel):
 
     items: list[TaskResponse]
     total: int = Field(description="Total number of tasks")
+    page: int = Field(ge=1, description="Current page number")
+    limit: int = Field(ge=1, description="Number of items per page")
+
+    @computed_field
+    @property
+    def total_pages(self) -> int:
+        """Calculate total number of pages."""
+        return (self.total + self.limit - 1) // self.limit if self.total > 0 else 1
+
+    @computed_field
+    @property
+    def has_next(self) -> bool:
+        """Check if there is a next page."""
+        return self.page < self.total_pages
+
+    @computed_field
+    @property
+    def has_prev(self) -> bool:
+        """Check if there is a previous page."""
+        return self.page > 1
+
+
+class TaskBulkUpdateItem(TaskUpdate):
+    """Single task update item for bulk operation."""
+
+    id: UUID = Field(..., description="Task ID to update")
+
+
+class TaskBulkUpdate(BaseModel):
+    """Request model for bulk task update."""
+
+    tasks: list[TaskBulkUpdateItem] = Field(..., min_length=1, description="List of tasks to update")
+
+
+class TaskBulkDelete(BaseModel):
+    """Request model for bulk task delete."""
+
+    ids: list[UUID] = Field(..., min_length=1, description="List of task IDs to delete")
+
+
+class TaskBulkUpdateResponse(BaseModel):
+    """Response model for bulk update."""
+
+    updated: list[TaskResponse] = Field(default_factory=list, description="Updated tasks")
+
+
+class TaskBulkDeleteResponse(BaseModel):
+    """Response model for bulk delete."""
+
+    deleted_count: int = Field(..., description="Number of deleted tasks")
+
+
+# ============== Batch Models ==============
+
+
+class BatchCreate(BaseModel):
+    """Request model for creating a batch with tasks."""
+
+    session_id: UUID | None = Field(default=None, description="AI session ID")
+    reason: str | None = Field(default=None, description="AI's reason for creating these tasks")
+    tasks: list[TaskCreate] = Field(..., min_length=1, description="List of tasks to create")
+
+
+class BatchResponse(BaseModel):
+    """Response model from Batch service."""
+
+    id: UUID
+    session_id: UUID | None
+    reason: str | None
+    created_at: datetime
+    tasks: list[TaskResponse] = Field(default_factory=list)
+
+    model_config = {"from_attributes": True}
+
+
+class BatchListResponse(BaseModel):
+    """Paginated batch list response."""
+
+    items: list[BatchResponse]
+    total: int = Field(description="Total number of batches")
+    page: int = Field(ge=1, description="Current page number")
+    limit: int = Field(ge=1, description="Number of items per page")
+
+    @computed_field
+    @property
+    def total_pages(self) -> int:
+        """Calculate total number of pages."""
+        return (self.total + self.limit - 1) // self.limit if self.total > 0 else 1
+
+    @computed_field
+    @property
+    def has_next(self) -> bool:
+        """Check if there is a next page."""
+        return self.page < self.total_pages
+
+    @computed_field
+    @property
+    def has_prev(self) -> bool:
+        """Check if there is a previous page."""
+        return self.page > 1
+
+
+# ============== File Models ==============
+
+
+class FileCreate(BaseModel):
+    """Request model for uploading a file."""
+
+    filename: str = Field(..., min_length=1, max_length=255, description="File name")
+    description: str | None = Field(default=None, max_length=1000, description="File description")
+    session_id: UUID | None = Field(default=None, description="Optional session ID")
+
+
+class FileUpdate(BaseModel):
+    """Request model for updating file metadata."""
+
+    filename: str | None = Field(default=None, min_length=1, max_length=255, description="New file name")
+    description: str | None = Field(default=None, max_length=1000, description="New description")
+
+
+class FileResponse(BaseModel):
+    """Response model from File service."""
+
+    id: UUID
+    filename: str
+    content_type: str
+    size: int
+    session_id: UUID | None
+    description: str | None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+    @property
+    def size_human(self) -> str:
+        """Return human-readable file size."""
+        size = self.size
+        for unit in ["B", "KB", "MB", "GB"]:
+            if size < 1024:
+                return f"{size:.1f} {unit}"
+            size /= 1024
+        return f"{size:.1f} TB"
+
+
+class FileListResponse(BaseModel):
+    """Paginated file list response."""
+
+    items: list[FileResponse]
+    total: int = Field(description="Total number of files")
     page: int = Field(ge=1, description="Current page number")
     limit: int = Field(ge=1, description="Number of items per page")
 
@@ -232,3 +384,19 @@ class SessionHistory(BaseModel):
     session_id: str = Field(..., description="Unique session identifier")
     started_at: datetime = Field(default_factory=datetime.now, description="Session start time")
     turns: list[ConversationTurn] = Field(default_factory=list, description="List of conversation turns")
+
+
+# ============== Usage Models ==============
+
+
+class UsageStats(BaseModel):
+    """API usage statistics."""
+
+    total_input_tokens: int = Field(..., description="Total input tokens used")
+    total_output_tokens: int = Field(..., description="Total output tokens generated")
+    total_cached_tokens: int = Field(..., description="Total cached input tokens")
+    total_cost_usd: Decimal = Field(..., description="Total cost in USD")
+    request_count: int = Field(..., description="Number of API requests")
+    period: str = Field(..., description="Period type: today, month, or all")
+    period_start: datetime | None = Field(None, description="Start of the period (UTC)")
+    period_end: datetime | None = Field(None, description="End of the period (UTC)")

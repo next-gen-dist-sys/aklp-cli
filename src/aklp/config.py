@@ -28,6 +28,10 @@ class Settings(BaseSettings):
         default="http://localhost:8003",
         description="Base URL for Task service (aklp-task)",
     )
+    file_service_url: HttpUrl = Field(
+        default="http://localhost:8004",
+        description="Base URL for File service (aklp-file)",
+    )
 
 
 @lru_cache

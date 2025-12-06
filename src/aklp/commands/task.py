@@ -10,8 +10,11 @@ from rich.console import Console
 from rich.table import Table
 
 from aklp.models import TaskPriority, TaskResponse, TaskStatus
+from aklp.models import TaskBulkUpdateItem
 from aklp.services.task import (
     TaskServiceError,
+    bulk_delete_tasks,
+    bulk_update_tasks,
     create_task,
     delete_task,
     get_task,
@@ -142,6 +145,10 @@ def list_cmd(
     page: Annotated[int, typer.Option("--page", "-p", help="페이지 번호")] = 1,
     limit: Annotated[int, typer.Option("--limit", "-l", help="페이지당 항목 수")] = 10,
     status: Annotated[str | None, typer.Option("--status", "-s", help="상태 필터 (pending/in_progress/completed)")] = None,
+    batch_id: Annotated[str | None, typer.Option("--batch", "-b", help="배치 ID로 필터링")] = None,
+    session_id: Annotated[str | None, typer.Option("--session", help="세션 ID로 필터링")] = None,
+    sort_by: Annotated[str | None, typer.Option("--sort", help="정렬 기준 (updated_at/created_at/due_date/priority/status)")] = None,
+    order: Annotated[str, typer.Option("--order", "-o", help="정렬 순서 (asc/desc)")] = "desc",
 ) -> None:
     """작업 목록을 조회합니다."""
     try:
@@ -154,7 +161,22 @@ def list_cmd(
                 console.print("[dim]유효한 값: pending, in_progress, completed[/dim]")
                 raise typer.Exit(code=1)
 
-        result = asyncio.run(list_tasks(page=page, limit=limit, status=task_status))
+        if order.lower() not in ("asc", "desc"):
+            console.print(f"[red]오류:[/red] 유효하지 않은 정렬 순서입니다: {order}")
+            console.print("[dim]유효한 값: asc, desc[/dim]")
+            raise typer.Exit(code=1)
+
+        result = asyncio.run(
+            list_tasks(
+                page=page,
+                limit=limit,
+                status=task_status,
+                batch_id=batch_id,
+                session_id=session_id,
+                sort_by=sort_by,
+                sort_order=order.lower(),
+            )
+        )
         if not result.items:
             console.print("[yellow]작업이 없습니다.[/yellow]")
             return
@@ -283,6 +305,58 @@ def done_cmd(
     except ValueError:
         console.print(f"[red]오류:[/red] 유효하지 않은 UUID 형식입니다: {task_id}")
         raise typer.Exit(code=1)
+    except TaskServiceError as e:
+        console.print(f"[red]오류:[/red] {e}")
+        raise typer.Exit(code=1)
+
+
+@task_app.command("bulk-done")
+def bulk_done_cmd(
+    task_ids: Annotated[list[str], typer.Argument(help="작업 UUID 목록 (공백으로 구분)")],
+) -> None:
+    """여러 작업을 한번에 완료 상태로 변경합니다."""
+    try:
+        updates = []
+        for task_id in task_ids:
+            try:
+                uuid = UUID(task_id)
+                updates.append(TaskBulkUpdateItem(id=uuid, status=TaskStatus.COMPLETED))
+            except ValueError:
+                console.print(f"[red]오류:[/red] 유효하지 않은 UUID 형식입니다: {task_id}")
+                raise typer.Exit(code=1)
+
+        result = asyncio.run(bulk_update_tasks(updates))
+        console.print(f"[green]{len(result.updated)}개 작업이 완료되었습니다.[/green]")
+        for task in result.updated:
+            console.print(f"  • {task.id}: {task.title}")
+    except TaskServiceError as e:
+        console.print(f"[red]오류:[/red] {e}")
+        raise typer.Exit(code=1)
+
+
+@task_app.command("bulk-delete")
+def bulk_delete_cmd(
+    task_ids: Annotated[list[str], typer.Argument(help="작업 UUID 목록 (공백으로 구분)")],
+    force: Annotated[bool, typer.Option("--force", "-f", help="확인 없이 삭제")] = False,
+) -> None:
+    """여러 작업을 한번에 삭제합니다."""
+    try:
+        uuids = []
+        for task_id in task_ids:
+            try:
+                uuids.append(UUID(task_id))
+            except ValueError:
+                console.print(f"[red]오류:[/red] 유효하지 않은 UUID 형식입니다: {task_id}")
+                raise typer.Exit(code=1)
+
+        if not force:
+            confirm = typer.confirm(f"정말로 {len(uuids)}개 작업을 삭제하시겠습니까?")
+            if not confirm:
+                console.print("[yellow]삭제가 취소되었습니다.[/yellow]")
+                return
+
+        result = asyncio.run(bulk_delete_tasks(uuids))
+        console.print(f"[green]{result.deleted_count}개 작업이 삭제되었습니다.[/green]")
     except TaskServiceError as e:
         console.print(f"[red]오류:[/red] {e}")
         raise typer.Exit(code=1)
