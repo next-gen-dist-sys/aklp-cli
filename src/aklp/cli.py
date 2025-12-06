@@ -199,7 +199,8 @@ def main(
     ctx: typer.Context,
     prompt: Annotated[
         str | None,
-        typer.Argument(
+        typer.Option(
+            "--prompt", "-p",
             help="자연어로 작성된 작업 요청. 생략 시 대화형 모드로 시작합니다."
         ),
     ] = None,
