@@ -200,8 +200,7 @@ def main(
     prompt: Annotated[
         str | None,
         typer.Option(
-            "--prompt", "-p",
-            help="자연어로 작성된 작업 요청. 생략 시 대화형 모드로 시작합니다."
+            "--prompt", "-p", help="자연어로 작성된 작업 요청. 생략 시 대화형 모드로 시작합니다."
         ),
     ] = None,
 ) -> None:
@@ -572,9 +571,7 @@ async def interactive_mode() -> None:
 
             if turn.executed and not turn.error:
                 elapsed_time = time.time() - start_time
-                console.print(
-                    f"\n[dim]작업 완료 (소요 시간: {elapsed_time:.2f}초)[/dim]"
-                )
+                console.print(f"\n[dim]작업 완료 (소요 시간: {elapsed_time:.2f}초)[/dim]")
 
             display_turn_separator()
 

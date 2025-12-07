@@ -18,19 +18,46 @@ from rich.syntax import Syntax
 from rich.table import Table
 from rich.text import Text
 
-from aklp.models import AgentResponse, AnalysisResult, BatchResponse, ConversationTurn, FileResponse, LegacyTaskResponse, NoteResponse, TaskResponse, UsageStats
+from aklp.models import (
+    AgentResponse,
+    AnalysisResult,
+    BatchResponse,
+    ConversationTurn,
+    FileResponse,
+    LegacyTaskResponse,
+    NoteResponse,
+    TaskResponse,
+    UsageStats,
+)
 
 console = Console()
 
 # prompt_toolkit 설정
 _history_file = Path.home() / ".aklp_input_history"
 _command_completer = WordCompleter(
-    ["/help", "/history", "/clear", "/exit", "/quit", "/notes", "/note", "/tasks", "/task", "/files", "/file", "/batches", "/batch", "/usage"],
+    [
+        "/help",
+        "/history",
+        "/clear",
+        "/exit",
+        "/quit",
+        "/notes",
+        "/note",
+        "/tasks",
+        "/task",
+        "/files",
+        "/file",
+        "/batches",
+        "/batch",
+        "/usage",
+    ],
     ignore_case=True,
 )
-_prompt_style = PTStyle.from_dict({
-    "prompt": "ansiblue bold",
-})
+_prompt_style = PTStyle.from_dict(
+    {
+        "prompt": "ansiblue bold",
+    }
+)
 
 # PromptSession 초기화 (방향키 히스토리, 한글 입력, 백스페이스 완벽 지원)
 _prompt_session: PromptSession[str] | None = None
@@ -47,6 +74,7 @@ def _get_prompt_session() -> PromptSession[str]:
             enable_history_search=True,
         )
     return _prompt_session
+
 
 # Color palette (works well on both light and dark themes)
 COLORS = {
@@ -322,7 +350,9 @@ def display_completion_message(elapsed_time: float) -> None:
 
     completion_text = Text()
     completion_text.append("🎉 ", style=COLORS["success"])
-    completion_text.append("모든 작업이 성공적으로 완료되었습니다!", style=f"bold {COLORS['success']}")
+    completion_text.append(
+        "모든 작업이 성공적으로 완료되었습니다!", style=f"bold {COLORS['success']}"
+    )
     completion_text.append("\n\n", style="")
     completion_text.append("⏱️  소요 시간: ", style=COLORS["muted"])
     completion_text.append(f"{elapsed_time:.2f}초", style=f"bold {COLORS['primary']}")
@@ -553,9 +583,7 @@ def display_history(turns: list[ConversationTurn]) -> None:
     for i, turn in enumerate(turns, 1):
         timestamp = turn.timestamp.strftime("%Y-%m-%d %H:%M:%S")
         prompt_preview = (
-            turn.user_prompt[:42] + "..."
-            if len(turn.user_prompt) > 45
-            else turn.user_prompt
+            turn.user_prompt[:42] + "..." if len(turn.user_prompt) > 45 else turn.user_prompt
         )
         executed = "✓" if turn.executed else "✗"
 
@@ -579,11 +607,7 @@ def display_history(turns: list[ConversationTurn]) -> None:
 
     console.print(table)
     console.print()
-    console.print(
-        Align.center(
-            f"[{COLORS['muted']}]총 {len(turns)}개의 대화[/{COLORS['muted']}]"
-        )
-    )
+    console.print(Align.center(f"[{COLORS['muted']}]총 {len(turns)}개의 대화[/{COLORS['muted']}]"))
     console.print()
 
 
@@ -640,9 +664,7 @@ def display_notes_list(notes: list[NoteResponse], total: int, page: int, total_p
     if total_pages > 1:
         console.print()
         console.print(
-            Align.center(
-                f"[{COLORS['muted']}]페이지 이동: /notes <page>[/{COLORS['muted']}]"
-            )
+            Align.center(f"[{COLORS['muted']}]페이지 이동: /notes <page>[/{COLORS['muted']}]")
         )
 
 
@@ -659,8 +681,12 @@ def display_note_detail(note: NoteResponse) -> None:
     content.append(note.content, style="")
     content.append("\n\n", style="")
     content.append(f"ID: {note.id}\n", style=COLORS["muted"])
-    content.append(f"생성일: {note.created_at.strftime('%Y-%m-%d %H:%M:%S')}\n", style=COLORS["muted"])
-    content.append(f"수정일: {note.updated_at.strftime('%Y-%m-%d %H:%M:%S')}", style=COLORS["muted"])
+    content.append(
+        f"생성일: {note.created_at.strftime('%Y-%m-%d %H:%M:%S')}\n", style=COLORS["muted"]
+    )
+    content.append(
+        f"수정일: {note.updated_at.strftime('%Y-%m-%d %H:%M:%S')}", style=COLORS["muted"]
+    )
     if note.session_id:
         content.append(f"\n세션 ID: {note.session_id}", style=COLORS["muted"])
 
@@ -751,9 +777,7 @@ def display_tasks_list(
     if total_pages > 1:
         console.print()
         console.print(
-            Align.center(
-                f"[{COLORS['muted']}]페이지 이동: /tasks <page>[/{COLORS['muted']}]"
-            )
+            Align.center(f"[{COLORS['muted']}]페이지 이동: /tasks <page>[/{COLORS['muted']}]")
         )
 
 
@@ -801,13 +825,21 @@ def display_task_detail(task: TaskResponse) -> None:
     content.append(f"{priority_str}\n", style=priority_color)
 
     if task.due_date:
-        content.append(f"마감일: {task.due_date.strftime('%Y-%m-%d %H:%M')}\n", style=COLORS["muted"])
+        content.append(
+            f"마감일: {task.due_date.strftime('%Y-%m-%d %H:%M')}\n", style=COLORS["muted"]
+        )
     if task.completed_at:
-        content.append(f"완료일: {task.completed_at.strftime('%Y-%m-%d %H:%M')}\n", style=COLORS["success"])
+        content.append(
+            f"완료일: {task.completed_at.strftime('%Y-%m-%d %H:%M')}\n", style=COLORS["success"]
+        )
 
     content.append(f"\nID: {task.id}\n", style=COLORS["muted"])
-    content.append(f"생성일: {task.created_at.strftime('%Y-%m-%d %H:%M:%S')}\n", style=COLORS["muted"])
-    content.append(f"수정일: {task.updated_at.strftime('%Y-%m-%d %H:%M:%S')}", style=COLORS["muted"])
+    content.append(
+        f"생성일: {task.created_at.strftime('%Y-%m-%d %H:%M:%S')}\n", style=COLORS["muted"]
+    )
+    content.append(
+        f"수정일: {task.updated_at.strftime('%Y-%m-%d %H:%M:%S')}", style=COLORS["muted"]
+    )
 
     console.print(
         Panel(
@@ -843,11 +875,20 @@ def display_usage_stats(stats: UsageStats) -> None:
     table.add_column("항목", style=COLORS["muted"])
     table.add_column("값", justify="right")
 
-    table.add_row("Input Tokens", f"[{COLORS['text']}]{stats.total_input_tokens:,}[/{COLORS['text']}]")
-    table.add_row("Output Tokens", f"[{COLORS['text']}]{stats.total_output_tokens:,}[/{COLORS['text']}]")
-    table.add_row("Cached Tokens", f"[{COLORS['text']}]{stats.total_cached_tokens:,}[/{COLORS['text']}]")
+    table.add_row(
+        "Input Tokens", f"[{COLORS['text']}]{stats.total_input_tokens:,}[/{COLORS['text']}]"
+    )
+    table.add_row(
+        "Output Tokens", f"[{COLORS['text']}]{stats.total_output_tokens:,}[/{COLORS['text']}]"
+    )
+    table.add_row(
+        "Cached Tokens", f"[{COLORS['text']}]{stats.total_cached_tokens:,}[/{COLORS['text']}]"
+    )
     table.add_row("요청 수", f"[{COLORS['text']}]{stats.request_count:,}[/{COLORS['text']}]")
-    table.add_row("총 비용", f"[bold {COLORS['success']}]${stats.total_cost_usd:.6f}[/bold {COLORS['success']}]")
+    table.add_row(
+        "총 비용",
+        f"[bold {COLORS['success']}]${stats.total_cost_usd:.6f}[/bold {COLORS['success']}]",
+    )
 
     console.print(table)
 
@@ -911,9 +952,7 @@ def display_files_list(
     if total_pages > 1:
         console.print()
         console.print(
-            Align.center(
-                f"[{COLORS['muted']}]페이지 이동: /files <page>[/{COLORS['muted']}]"
-            )
+            Align.center(f"[{COLORS['muted']}]페이지 이동: /files <page>[/{COLORS['muted']}]")
         )
 
 
@@ -938,8 +977,12 @@ def display_file_detail(file: FileResponse) -> None:
         content.append(f"{file.description}\n", style="")
 
     content.append(f"\nID: {file.id}\n", style=COLORS["muted"])
-    content.append(f"생성일: {file.created_at.strftime('%Y-%m-%d %H:%M:%S')}\n", style=COLORS["muted"])
-    content.append(f"수정일: {file.updated_at.strftime('%Y-%m-%d %H:%M:%S')}", style=COLORS["muted"])
+    content.append(
+        f"생성일: {file.created_at.strftime('%Y-%m-%d %H:%M:%S')}\n", style=COLORS["muted"]
+    )
+    content.append(
+        f"수정일: {file.updated_at.strftime('%Y-%m-%d %H:%M:%S')}", style=COLORS["muted"]
+    )
     if file.session_id:
         content.append(f"\n세션 ID: {file.session_id}", style=COLORS["muted"])
 
@@ -993,7 +1036,11 @@ def display_batches_list(
     table.add_column("생성일", style=COLORS["muted"])
 
     for batch in batches:
-        reason_preview = (batch.reason[:37] + "...") if batch.reason and len(batch.reason) > 40 else (batch.reason or "-")
+        reason_preview = (
+            (batch.reason[:37] + "...")
+            if batch.reason and len(batch.reason) > 40
+            else (batch.reason or "-")
+        )
         table.add_row(
             str(batch.id),
             reason_preview,
@@ -1006,9 +1053,7 @@ def display_batches_list(
     if total_pages > 1:
         console.print()
         console.print(
-            Align.center(
-                f"[{COLORS['muted']}]페이지 이동: /batches <page>[/{COLORS['muted']}]"
-            )
+            Align.center(f"[{COLORS['muted']}]페이지 이동: /batches <page>[/{COLORS['muted']}]")
         )
 
 
@@ -1037,7 +1082,9 @@ def display_batch_detail(batch: BatchResponse) -> None:
         content.append("사유: ", style=COLORS["muted"])
         content.append(f"{batch.reason}\n\n", style="")
 
-    content.append(f"생성일: {batch.created_at.strftime('%Y-%m-%d %H:%M:%S')}\n", style=COLORS["muted"])
+    content.append(
+        f"생성일: {batch.created_at.strftime('%Y-%m-%d %H:%M:%S')}\n", style=COLORS["muted"]
+    )
     if batch.session_id:
         content.append(f"세션 ID: {batch.session_id}", style=COLORS["muted"])
 

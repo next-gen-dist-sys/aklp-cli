@@ -44,9 +44,7 @@ async def analyze_prompt(prompt: str) -> AnalysisResult:
             return AnalysisResult.model_validate(data)
 
     except httpx.TimeoutException as e:
-        raise LLMServiceError(
-            f"LLM 서비스 응답 시간 초과 (30초). 서비스 상태를 확인하세요."
-        ) from e
+        raise LLMServiceError(f"LLM 서비스 응답 시간 초과 (30초). 서비스 상태를 확인하세요.") from e
     except httpx.HTTPStatusError as e:
         raise LLMServiceError(
             f"LLM 서비스 오류 (HTTP {e.response.status_code}): {e.response.text}"

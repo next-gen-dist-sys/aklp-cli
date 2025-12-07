@@ -63,7 +63,9 @@ def _display_batch(batch: BatchResponse) -> None:
         console.print("\n[dim]태스크가 없습니다.[/dim]")
 
 
-def _display_batches_table(batches: list[BatchResponse], total: int, page: int, total_pages: int) -> None:
+def _display_batches_table(
+    batches: list[BatchResponse], total: int, page: int, total_pages: int
+) -> None:
     """Display batches in a table format."""
     table = Table(title=f"Batches (Page {page}/{total_pages}, Total: {total})")
     table.add_column("ID", style="dim", max_width=36)
@@ -72,7 +74,11 @@ def _display_batches_table(batches: list[BatchResponse], total: int, page: int, 
     table.add_column("생성일", style="dim")
 
     for batch in batches:
-        reason_preview = (batch.reason[:37] + "...") if batch.reason and len(batch.reason) > 40 else (batch.reason or "-")
+        reason_preview = (
+            (batch.reason[:37] + "...")
+            if batch.reason and len(batch.reason) > 40
+            else (batch.reason or "-")
+        )
         table.add_row(
             str(batch.id),
             reason_preview,
@@ -86,7 +92,9 @@ def _display_batches_table(batches: list[BatchResponse], total: int, page: int, 
 @batch_app.command("list")
 def list_cmd(
     page: Annotated[int, typer.Option("--page", "-p", help="페이지 번호")] = 1,
-    session_id: Annotated[str | None, typer.Option("--session", "-s", help="세션 ID로 필터링")] = None,
+    session_id: Annotated[
+        str | None, typer.Option("--session", "-s", help="세션 ID로 필터링")
+    ] = None,
 ) -> None:
     """배치 목록을 조회합니다."""
     try:
@@ -121,7 +129,9 @@ def get_cmd(
 
 @batch_app.command("latest")
 def latest_cmd(
-    session_id: Annotated[str | None, typer.Option("--session", "-s", help="세션 ID로 필터링")] = None,
+    session_id: Annotated[
+        str | None, typer.Option("--session", "-s", help="세션 ID로 필터링")
+    ] = None,
 ) -> None:
     """최신 배치를 조회합니다."""
     try:

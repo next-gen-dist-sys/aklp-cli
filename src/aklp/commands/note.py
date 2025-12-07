@@ -37,7 +37,9 @@ def _display_note(note: NoteResponse) -> None:
         console.print(f"[dim]세션 ID: {note.session_id}[/dim]")
 
 
-def _display_notes_table(notes: list[NoteResponse], total: int, page: int, total_pages: int) -> None:
+def _display_notes_table(
+    notes: list[NoteResponse], total: int, page: int, total_pages: int
+) -> None:
     """Display notes in a table format."""
     table = Table(title=f"Notes (Page {page}/{total_pages}, Total: {total})")
     table.add_column("ID", style="dim", max_width=36)
@@ -75,7 +77,9 @@ def create(
 @note_app.command("list")
 def list_cmd(
     page: Annotated[int, typer.Option("--page", "-p", help="페이지 번호")] = 1,
-    session_id: Annotated[str | None, typer.Option("--session", "-s", help="세션 ID로 필터링")] = None,
+    session_id: Annotated[
+        str | None, typer.Option("--session", "-s", help="세션 ID로 필터링")
+    ] = None,
 ) -> None:
     """노트 목록을 조회합니다."""
     try:

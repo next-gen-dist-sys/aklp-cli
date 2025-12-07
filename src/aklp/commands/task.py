@@ -62,17 +62,25 @@ def _display_task(task: TaskResponse) -> None:
     console.print(f"[bold cyan]제목:[/bold cyan] {task.title}")
     if task.description:
         console.print(f"[bold cyan]설명:[/bold cyan] {task.description}")
-    console.print(f"[bold cyan]상태:[/bold cyan] [{status_color}]{task.status.value}[/{status_color}]")
-    console.print(f"[bold cyan]우선순위:[/bold cyan] [{priority_color}]{priority_str}[/{priority_color}]")
+    console.print(
+        f"[bold cyan]상태:[/bold cyan] [{status_color}]{task.status.value}[/{status_color}]"
+    )
+    console.print(
+        f"[bold cyan]우선순위:[/bold cyan] [{priority_color}]{priority_str}[/{priority_color}]"
+    )
     if task.due_date:
         console.print(f"[bold cyan]마감일:[/bold cyan] {task.due_date.strftime('%Y-%m-%d %H:%M')}")
     if task.completed_at:
-        console.print(f"[bold cyan]완료일:[/bold cyan] {task.completed_at.strftime('%Y-%m-%d %H:%M')}")
+        console.print(
+            f"[bold cyan]완료일:[/bold cyan] {task.completed_at.strftime('%Y-%m-%d %H:%M')}"
+        )
     console.print(f"[dim]생성일: {task.created_at.strftime('%Y-%m-%d %H:%M:%S')}[/dim]")
     console.print(f"[dim]수정일: {task.updated_at.strftime('%Y-%m-%d %H:%M:%S')}[/dim]")
 
 
-def _display_tasks_table(tasks: list[TaskResponse], total: int, page: int, total_pages: int) -> None:
+def _display_tasks_table(
+    tasks: list[TaskResponse], total: int, page: int, total_pages: int
+) -> None:
     """Display tasks in a table format."""
     table = Table(title=f"Tasks (Page {page}/{total_pages}, Total: {total})")
     table.add_column("ID", style="dim", max_width=36)
@@ -102,7 +110,9 @@ def _display_tasks_table(tasks: list[TaskResponse], total: int, page: int, total
 def create(
     title: Annotated[str, typer.Argument(help="작업 제목")],
     description: Annotated[str | None, typer.Option("--desc", "-d", help="작업 설명")] = None,
-    priority: Annotated[str | None, typer.Option("--priority", "-p", help="우선순위 (high/medium/low)")] = None,
+    priority: Annotated[
+        str | None, typer.Option("--priority", "-p", help="우선순위 (high/medium/low)")
+    ] = None,
     due_date: Annotated[str | None, typer.Option("--due", help="마감일 (YYYY-MM-DD 형식)")] = None,
 ) -> None:
     """새 작업을 생성합니다."""
@@ -144,10 +154,15 @@ def create(
 def list_cmd(
     page: Annotated[int, typer.Option("--page", "-p", help="페이지 번호")] = 1,
     limit: Annotated[int, typer.Option("--limit", "-l", help="페이지당 항목 수")] = 10,
-    status: Annotated[str | None, typer.Option("--status", "-s", help="상태 필터 (pending/in_progress/completed)")] = None,
+    status: Annotated[
+        str | None, typer.Option("--status", "-s", help="상태 필터 (pending/in_progress/completed)")
+    ] = None,
     batch_id: Annotated[str | None, typer.Option("--batch", "-b", help="배치 ID로 필터링")] = None,
     session_id: Annotated[str | None, typer.Option("--session", help="세션 ID로 필터링")] = None,
-    sort_by: Annotated[str | None, typer.Option("--sort", help="정렬 기준 (updated_at/created_at/due_date/priority/status)")] = None,
+    sort_by: Annotated[
+        str | None,
+        typer.Option("--sort", help="정렬 기준 (updated_at/created_at/due_date/priority/status)"),
+    ] = None,
     order: Annotated[str, typer.Option("--order", "-o", help="정렬 순서 (asc/desc)")] = "desc",
 ) -> None:
     """작업 목록을 조회합니다."""
@@ -210,9 +225,15 @@ def update_cmd(
     task_id: Annotated[str, typer.Argument(help="작업 UUID")],
     title: Annotated[str | None, typer.Option("--title", "-t", help="새 제목")] = None,
     description: Annotated[str | None, typer.Option("--desc", "-d", help="새 설명")] = None,
-    status: Annotated[str | None, typer.Option("--status", "-s", help="새 상태 (pending/in_progress/completed)")] = None,
-    priority: Annotated[str | None, typer.Option("--priority", "-p", help="새 우선순위 (high/medium/low)")] = None,
-    due_date: Annotated[str | None, typer.Option("--due", help="새 마감일 (YYYY-MM-DD 형식)")] = None,
+    status: Annotated[
+        str | None, typer.Option("--status", "-s", help="새 상태 (pending/in_progress/completed)")
+    ] = None,
+    priority: Annotated[
+        str | None, typer.Option("--priority", "-p", help="새 우선순위 (high/medium/low)")
+    ] = None,
+    due_date: Annotated[
+        str | None, typer.Option("--due", help="새 마감일 (YYYY-MM-DD 형식)")
+    ] = None,
 ) -> None:
     """작업을 수정합니다."""
     if all(v is None for v in [title, description, status, priority, due_date]):

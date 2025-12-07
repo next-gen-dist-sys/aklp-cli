@@ -62,7 +62,9 @@ class NoteCreate(BaseModel):
 class NoteUpdate(BaseModel):
     """Request model for updating a note."""
 
-    title: str | None = Field(default=None, min_length=1, max_length=255, description="Updated title")
+    title: str | None = Field(
+        default=None, min_length=1, max_length=255, description="Updated title"
+    )
     content: str | None = Field(default=None, min_length=1, description="Updated content")
 
 
@@ -200,7 +202,9 @@ class TaskBulkUpdateItem(TaskUpdate):
 class TaskBulkUpdate(BaseModel):
     """Request model for bulk task update."""
 
-    tasks: list[TaskBulkUpdateItem] = Field(..., min_length=1, description="List of tasks to update")
+    tasks: list[TaskBulkUpdateItem] = Field(
+        ..., min_length=1, description="List of tasks to update"
+    )
 
 
 class TaskBulkDelete(BaseModel):
@@ -285,7 +289,9 @@ class FileCreate(BaseModel):
 class FileUpdate(BaseModel):
     """Request model for updating file metadata."""
 
-    filename: str | None = Field(default=None, min_length=1, max_length=255, description="New file name")
+    filename: str | None = Field(
+        default=None, min_length=1, max_length=255, description="New file name"
+    )
     description: str | None = Field(default=None, max_length=1000, description="New description")
 
 
@@ -383,7 +389,9 @@ class SessionHistory(BaseModel):
 
     session_id: str = Field(..., description="Unique session identifier")
     started_at: datetime = Field(default_factory=datetime.now, description="Session start time")
-    turns: list[ConversationTurn] = Field(default_factory=list, description="List of conversation turns")
+    turns: list[ConversationTurn] = Field(
+        default_factory=list, description="List of conversation turns"
+    )
 
 
 # ============== Usage Models ==============

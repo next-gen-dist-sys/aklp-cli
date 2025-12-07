@@ -48,15 +48,15 @@ def _display_usage_stats(stats: UsageStats) -> None:
 
     if stats.period_start:
         console.print()
-        console.print(
-            f"[dim]기간: {stats.period_start.strftime('%Y-%m-%d %H:%M')} UTC ~[/dim]"
-        )
+        console.print(f"[dim]기간: {stats.period_start.strftime('%Y-%m-%d %H:%M')} UTC ~[/dim]")
 
 
 @usage_app.callback(invoke_without_command=True)
 def main(
     ctx: typer.Context,
-    period: Annotated[str, typer.Option("--period", "-p", help="조회 기간 (today/month/all)")] = "all",
+    period: Annotated[
+        str, typer.Option("--period", "-p", help="조회 기간 (today/month/all)")
+    ] = "all",
 ) -> None:
     """API 사용량을 조회합니다."""
     if ctx.invoked_subcommand is not None:

@@ -68,10 +68,13 @@ def execute_cmd(
             if typer.confirm("이 명령어를 클립보드에 복사하시겠습니까?", default=False):
                 try:
                     import pyperclip
+
                     pyperclip.copy(result.command)
                     console.print("[green]명령어가 클립보드에 복사되었습니다.[/green]")
                 except ImportError:
-                    console.print("[yellow]pyperclip이 설치되지 않아 클립보드 복사가 불가능합니다.[/yellow]")
+                    console.print(
+                        "[yellow]pyperclip이 설치되지 않아 클립보드 복사가 불가능합니다.[/yellow]"
+                    )
                 except Exception:
                     console.print("[yellow]클립보드 복사에 실패했습니다.[/yellow]")
 
