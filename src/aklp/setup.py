@@ -128,15 +128,19 @@ def run_first_time_setup() -> bool:
             console.print("[dim]OpenAI API 키는 'sk-'로 시작해야 합니다.[/dim]")
             continue
 
-        # Step 4: Create Secret
+        # Step 4: Create Secret and restart Agent
         console.print("\n[dim]Kubernetes Secret 생성 중...[/dim]")
 
         try:
             k8s_mgr.create_or_update_secret(api_key)
             console.print("[green]Secret 생성 성공![/green]")
+
+            console.print("[dim]Agent 서비스 재시작 중...[/dim]")
+            k8s_mgr.restart_agent_deployment()
+            console.print("[green]Agent 재시작 완료![/green]")
             break
         except KubernetesError as e:
-            console.print(f"\n[red]Secret 생성 실패:[/red] {e}")
+            console.print(f"\n[red]실패:[/red] {e}")
             console.print("[dim]다시 시도해주세요.[/dim]")
             continue
 
@@ -153,6 +157,19 @@ def run_first_time_setup() -> bool:
             f"설정 파일: {config_mgr.config_file}\n\n"
             "[dim]이제 AKLP CLI를 사용할 수 있습니다.[/dim]",
             title="Setup Complete",
+        )
+    )
+    console.print()
+
+    # KUBECONFIG tip
+    console.print(
+        Panel.fit(
+            "[bold cyan]Tip: kubectl 설정[/bold cyan]\n\n"
+            "kubectl 명령어 실행 시 kubeconfig를 자동으로 인식하려면\n"
+            "아래 명령어를 셸 설정 파일에 추가하세요:\n\n"
+            "[bold]export KUBECONFIG=~/.kube/config[/bold]\n\n"
+            "[dim]bash: ~/.bashrc | zsh: ~/.zshrc[/dim]",
+            border_style="cyan",
         )
     )
     console.print()
