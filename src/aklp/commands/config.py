@@ -114,8 +114,12 @@ def set_apikey() -> None:
     try:
         k8s_mgr.create_or_update_secret(api_key)
         console.print("[green]Secret 업데이트 성공![/green]")
+
+        console.print("[dim]Agent 서비스 재시작 중...[/dim]")
+        k8s_mgr.restart_agent_deployment()
+        console.print("[green]Agent 재시작 완료![/green]")
     except KubernetesError as e:
-        console.print(f"\n[red]Secret 업데이트 실패:[/red] {e}")
+        console.print(f"\n[red]실패:[/red] {e}")
         raise typer.Exit(code=1)
 
     config_mgr.set_api_key(api_key)
