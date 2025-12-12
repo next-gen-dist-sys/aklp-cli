@@ -1,5 +1,6 @@
 """Kubernetes cluster management for AKLP CLI."""
 
+from datetime import datetime, timezone
 from pathlib import Path
 
 import urllib3
@@ -8,6 +9,7 @@ from kubernetes.client.rest import ApiException
 
 NAMESPACE = "aklp"
 SECRET_NAME = "openai-secret"
+AGENT_DEPLOYMENT_NAME = "aklp-agent"
 KUBECONFIG_PATH = Path.home() / ".kube" / "config"
 API_TIMEOUT = 10  # seconds
 
@@ -29,6 +31,7 @@ class KubernetesManager:
         """
         self.kubeconfig_path = kubeconfig_path or KUBECONFIG_PATH
         self._core_api: client.CoreV1Api | None = None
+        self._apps_api: client.AppsV1Api | None = None
 
     def _load_config(self) -> None:
         """Load kubeconfig and initialize API client."""
@@ -133,3 +136,49 @@ class KubernetesManager:
             return True
         except ApiException:
             return False
+
+    @property
+    def apps_api(self) -> client.AppsV1Api:
+        """Get AppsV1Api client, loading config if needed."""
+        if self._apps_api is None:
+            if self._core_api is None:
+                self._load_config()
+            self._apps_api = client.AppsV1Api()
+        return self._apps_api
+
+    def restart_agent_deployment(self) -> bool:
+        """Restart agent deployment to apply secret changes.
+
+        Performs a rollout restart by patching the deployment with
+        a restart annotation (same as kubectl rollout restart).
+
+        Returns:
+            bool: True if restart triggered successfully.
+
+        Raises:
+            KubernetesError: If restart fails.
+        """
+        now = datetime.now(timezone.utc).isoformat()
+        patch_body = {
+            "spec": {
+                "template": {
+                    "metadata": {
+                        "annotations": {
+                            "kubectl.kubernetes.io/restartedAt": now,
+                        }
+                    }
+                }
+            }
+        }
+
+        try:
+            self.apps_api.patch_namespaced_deployment(
+                name=AGENT_DEPLOYMENT_NAME,
+                namespace=NAMESPACE,
+                body=patch_body,
+            )
+            return True
+        except ApiException as e:
+            raise KubernetesError(
+                f"Agent 재시작 실패: {e.reason}"
+            ) from e
