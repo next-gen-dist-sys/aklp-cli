@@ -43,7 +43,7 @@ async def execute_command(
     )
 
     try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(timeout=90.0) as client:
             response = await client.post(
                 url,
                 json=request_data.model_dump(mode="json"),
@@ -55,7 +55,7 @@ async def execute_command(
 
     except httpx.TimeoutException as e:
         raise AgentServiceError(
-            "Agent 서비스 응답 시간 초과 (30초). 서비스 상태를 확인하세요."
+            "Agent 서비스 응답 시간 초과 (90초). 서비스 상태를 확인하세요."
         ) from e
     except httpx.HTTPStatusError as e:
         raise AgentServiceError(
