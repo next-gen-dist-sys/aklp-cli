@@ -13,6 +13,7 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 
 from aklp.commands.agent import agent_app
 from aklp.commands.batch import batch_app
+from aklp.commands.config import config_app
 from aklp.commands.file import file_app
 from aklp.commands.note import note_app
 from aklp.commands.task import task_app
@@ -60,6 +61,7 @@ app = typer.Typer(
 # Register subcommands
 app.add_typer(agent_app, name="agent")
 app.add_typer(batch_app, name="batch")
+app.add_typer(config_app, name="config")
 app.add_typer(file_app, name="file")
 app.add_typer(note_app, name="note")
 app.add_typer(task_app, name="task")
@@ -81,14 +83,8 @@ def validate_configuration() -> bool:
         console.print(f"[dim]  • Task: {settings.task_service_url}[/dim]")
         console.print(f"[dim]  • File: {settings.file_service_url}[/dim]")
         return True
-    except ValidationError:
-        display_error("환경 설정 오류")
-        console.print("\n필요한 환경 변수가 설정되지 않았습니다:")
-        console.print("  • AGENT_SERVICE_URL")
-        console.print("  • NOTE_SERVICE_URL")
-        console.print("  • TASK_SERVICE_URL")
-        console.print("\n.env 파일을 생성하거나 환경 변수를 설정해주세요.")
-        console.print("예시: .env.example 파일을 참조하세요.")
+    except RuntimeError as e:
+        display_error(str(e))
         return False
 
 
@@ -217,12 +213,12 @@ def main(
     if ctx.invoked_subcommand is not None:
         return
 
-    # First-time setup: check for API key
+    # First-time setup: check for cluster host and API key
     from aklp.secrets import ConfigManager
     from aklp.setup import run_first_time_setup
 
     config_mgr = ConfigManager()
-    if not config_mgr.has_api_key():
+    if not config_mgr.is_configured():
         if not run_first_time_setup():
             raise typer.Exit(code=1)
 
