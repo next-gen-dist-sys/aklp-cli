@@ -1,13 +1,11 @@
 """Main CLI application using Typer."""
 
 import asyncio
-import sys
 import time
 from typing import Annotated
 from uuid import UUID
 
 import typer
-from pydantic import ValidationError
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
