@@ -41,6 +41,41 @@ class ConfigManager:
         self.config_file.write_text(tomli_w.dumps(config))
         self.config_file.chmod(0o600)  # Read/write owner only
 
+    # ============== Cluster Host ==============
+
+    def has_cluster_host(self) -> bool:
+        """Check if cluster host is configured.
+
+        Returns:
+            bool: True if cluster host exists and is non-empty.
+        """
+        config = self._load_config()
+        host = config.get("cluster", {}).get("host", "")
+        return bool(host)
+
+    def get_cluster_host(self) -> str | None:
+        """Get stored cluster host.
+
+        Returns:
+            str | None: Cluster host if exists, None otherwise.
+        """
+        config = self._load_config()
+        return config.get("cluster", {}).get("host")
+
+    def set_cluster_host(self, host: str) -> None:
+        """Store cluster host to config file.
+
+        Args:
+            host: Cluster host (IP or hostname).
+        """
+        config = self._load_config()
+        if "cluster" not in config:
+            config["cluster"] = {}
+        config["cluster"]["host"] = host
+        self._save_config(config)
+
+    # ============== API Key ==============
+
     def has_api_key(self) -> bool:
         """Check if OpenAI API key is configured.
 
@@ -71,3 +106,18 @@ class ConfigManager:
             config["openai"] = {}
         config["openai"]["api_key"] = api_key
         self._save_config(config)
+
+    # ============== Reset ==============
+
+    def reset(self) -> None:
+        """Reset all configuration by deleting config file."""
+        if self.config_file.exists():
+            self.config_file.unlink()
+
+    def is_configured(self) -> bool:
+        """Check if both cluster host and API key are configured.
+
+        Returns:
+            bool: True if fully configured.
+        """
+        return self.has_cluster_host() and self.has_api_key()
