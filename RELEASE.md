@@ -4,7 +4,7 @@
 
 ## 릴리즈 흐름
 
-```
+```text
 1. PR 생성 (제목: "feat: 새 기능")
        ↓
 2. PR 제목 검사 자동 실행
@@ -24,7 +24,7 @@
 
 **Settings → General → Pull Requests:**
 
-```
+```text
 ☑ Allow squash merging
   ☑ Default to pull request title   ← 중요!
 
@@ -36,7 +36,7 @@
 
 **Settings → Branches → Add rule:**
 
-```
+```text
 Branch name pattern: main
 
 ☑ Require a pull request before merging
@@ -52,7 +52,7 @@ Branch name pattern: main
 
 **Settings → Actions → General:**
 
-```
+```text
 Workflow permissions:
   ☑ Read and write permissions
   ☑ Allow GitHub Actions to create and approve pull requests
@@ -62,7 +62,7 @@ Workflow permissions:
 
 PR 제목은 다음 형식을 따라야 합니다:
 
-```
+```text
 <type>: <description>
 
 # 또는 scope 포함
@@ -71,25 +71,25 @@ PR 제목은 다음 형식을 따라야 합니다:
 
 ### Type 종류
 
-| Type | 설명 | 릴리즈 |
-|------|------|--------|
-| `feat` | 새로운 기능 | Minor (1.X.0) |
-| `fix` | 버그 수정 | Patch (1.0.X) |
-| `docs` | 문서 변경 | 릴리즈 안 함 |
-| `style` | 코드 스타일 변경 | 릴리즈 안 함 |
-| `refactor` | 리팩토링 | 릴리즈 안 함 |
-| `perf` | 성능 개선 | Patch |
-| `test` | 테스트 추가/수정 | 릴리즈 안 함 |
-| `build` | 빌드 설정 변경 | 릴리즈 안 함 |
-| `ci` | CI 설정 변경 | 릴리즈 안 함 |
-| `chore` | 기타 변경 | 릴리즈 안 함 |
-| `revert` | 커밋 되돌리기 | Patch |
+| Type       | 설명             | 릴리즈        |
+| ---------- | ---------------- | ------------- |
+| `feat`     | 새로운 기능      | Minor (1.X.0) |
+| `fix`      | 버그 수정        | Patch (1.0.X) |
+| `docs`     | 문서 변경        | 릴리즈 안 함  |
+| `style`    | 코드 스타일 변경 | 릴리즈 안 함  |
+| `refactor` | 리팩토링         | 릴리즈 안 함  |
+| `perf`     | 성능 개선        | Patch         |
+| `test`     | 테스트 추가/수정 | 릴리즈 안 함  |
+| `build`    | 빌드 설정 변경   | 릴리즈 안 함  |
+| `ci`       | CI 설정 변경     | 릴리즈 안 함  |
+| `chore`    | 기타 변경        | 릴리즈 안 함  |
+| `revert`   | 커밋 되돌리기    | Patch         |
 
 ### Breaking Change
 
 호환성이 깨지는 변경은 `!`를 추가:
 
-```
+```text
 feat!: API 응답 형식 변경
 
 # 또는 본문에 BREAKING CHANGE 포함
@@ -102,7 +102,7 @@ BREAKING CHANGE: response.data가 response.result로 변경됨
 
 ### 예시
 
-```
+```text
 feat: kubectl 실행 기능 추가
 fix: KUBECONFIG 경로 인식 오류 수정
 docs: README 설치 가이드 업데이트
@@ -116,7 +116,7 @@ fix(executor): 타임아웃 처리 버그 수정
 
 `feat:` 또는 `fix:` 커밋이 main에 머지되면, release-please가 자동으로 Release PR을 생성합니다:
 
-```
+```text
 chore(main): release 1.2.0
 
 ## [1.2.0](link) (2025-01-15)
@@ -139,11 +139,11 @@ Release PR을 머지하면:
 
 ### 빌드 플랫폼
 
-| Platform | Runner | Asset Name |
-|----------|--------|------------|
-| Linux x64 | ubuntu-latest | `aklp-linux-x64` |
-| macOS x64 | macos-13 | `aklp-macos-x64` |
-| macOS ARM64 | macos-latest | `aklp-macos-arm64` |
+| Platform    | Runner         | Asset Name             |
+| ----------- | -------------- | ---------------------- |
+| Linux x64   | ubuntu-latest  | `aklp-linux-x64`       |
+| macOS x64   | macos-15       | `aklp-macos-x64`       |
+| macOS ARM64 | macos-latest   | `aklp-macos-arm64`     |
 | Windows x64 | windows-latest | `aklp-windows-x64.exe` |
 
 ## 수동 릴리즈 (비상 시)
@@ -176,7 +176,7 @@ AKLP_VERSION=v1.0.0 ./install.sh install
 
 ### PR 제목 검사 실패
 
-```
+```text
 ❌ PR Title Check failed
 ```
 
@@ -195,7 +195,7 @@ AKLP_VERSION=v1.0.0 ./install.sh install
 
 ## 파일 구조
 
-```
+```text
 .github/
 ├── workflows/
 │   ├── pr-title.yml         # PR 제목 검사
