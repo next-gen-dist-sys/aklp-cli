@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/next-gen-dist-sys/aklp-cli/compare/v0.2.0...v0.2.1) (2025-12-16)
+
+
+### Bug Fixes
+
+* 자동 릴리즈는 release-please.yml에서 처리 ([#7](https://github.com/next-gen-dist-sys/aklp-cli/issues/7)) ([b0c55de](https://github.com/next-gen-dist-sys/aklp-cli/commit/b0c55dec56024077939deaf2d3e1cc65c09c3b4d))
+
 ## [0.2.0](https://github.com/next-gen-dist-sys/aklp-cli/compare/v0.1.0...v0.2.0) (2025-12-16)
 
 
