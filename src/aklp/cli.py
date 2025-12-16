@@ -117,15 +117,18 @@ async def process_user_request(
     turn = ConversationTurn(user_prompt=prompt)
 
     try:
-        # Step 1-2: Call Agent service
+        # Step 1-2: Call Agent service (measure LLM time)
+        llm_start_time = time.time()
         with console.status(
             "[bold green]Agent가 요청을 분석하고 있습니다...[/bold green]",
             spinner="dots",
         ):
             agent_response: AgentResponse = await execute_command(prompt)
+        turn.llm_elapsed_time = time.time() - llm_start_time
 
         # Step 3: Display Agent result
         display_agent_result(agent_response)
+        console.print(f"[dim]  LLM 응답 시간: {turn.llm_elapsed_time:.2f}초[/dim]")
 
         # Check if agent returned an error
         if not agent_response.success:
@@ -608,7 +611,8 @@ async def interactive_mode() -> None:
 
             if turn.executed and not turn.error:
                 elapsed_time = time.time() - start_time
-                console.print(f"\n[dim]작업 완료 (소요 시간: {elapsed_time:.2f}초)[/dim]")
+                llm_time = turn.llm_elapsed_time or 0.0
+                console.print(f"\n[dim]작업 완료 (전체 {elapsed_time:.2f}초 / LLM {llm_time:.2f}초)[/dim]")
 
             display_turn_separator()
 
