@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.2](https://github.com/next-gen-dist-sys/aklp-cli/compare/v0.2.1...v0.2.2) (2025-12-16)
+
+
+### Documentation
+
+* README 바이너리 설치 가이드 추가 ([#9](https://github.com/next-gen-dist-sys/aklp-cli/issues/9)) ([202ec4b](https://github.com/next-gen-dist-sys/aklp-cli/commit/202ec4b8770089901a498a8a0263c29c4dde878a))
+
 ## [0.2.1](https://github.com/next-gen-dist-sys/aklp-cli/compare/v0.2.0...v0.2.1) (2025-12-16)
 
 
