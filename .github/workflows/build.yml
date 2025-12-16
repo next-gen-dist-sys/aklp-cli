@@ -21,7 +21,7 @@ jobs:
             target: linux-x64
             binary_name: aklp
             asset_name: aklp-linux-x64
-          - os: macos-13
+          - os: macos-15
             target: macos-x64
             binary_name: aklp
             asset_name: aklp-macos-x64
@@ -47,11 +47,13 @@ jobs:
         uses: astral-sh/setup-uv@v4
 
       - name: Install dependencies
+        shell: bash
         run: |
           uv sync
           uv pip install pyinstaller
 
       - name: Build binary with PyInstaller
+        shell: bash
         run: |
           uv run pyinstaller \
             --onefile \
