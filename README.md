@@ -1,235 +1,165 @@
-# AKLP - MSA CLI 에이전트
+# AKLP - AI Kubernetes Learning Platform CLI
 
-FastAPI 마이크로서비스(LLM, Note, Task)와 연동하여 자연어 입력을 통해 파일 생성과 쉘 명령어 실행을 자동화하는 Python 3.14 기반 대화형 CLI 에이전트입니다.
+자연어로 Kubernetes를 학습하고 관리할 수 있는 AI 기반 CLI 도구입니다. 복잡한 kubectl 명령어를 몰라도 한글로 원하는 작업을 설명하면 AI가 적절한 명령어를 생성하고 실행합니다.
 
 ## ✨ 주요 기능
 
-- **🗣️ 대화형 모드**: Claude Code처럼 계속 대화하며 작업 수행
-- **💬 자연어 처리**: 한글/영어로 원하는 작업을 설명하면 AI가 분석
-- **👤 Human-in-the-Loop**: 실행 전 사용자 확인 및 승인 과정
-- **🎨 모던한 UI**: Rich 라이브러리 기반의 우아하고 세련된 터미널 인터페이스
-- **⚡ 비동기 아키텍처**: httpx 기반 빠른 비차단 I/O 처리
-- **📜 세션 히스토리**: 대화 내역 자동 저장 및 조회 기능
-- **🔒 타입 안전성**: Pydantic V2 기반 완전한 타입 검증
+- **🗣️ 자연어 인터페이스**: 한글/영어로 Kubernetes 작업 요청
+- **🎯 kubectl 명령 생성**: AI가 자연어를 kubectl 명령어로 변환
+- **👤 Human-in-the-Loop**: 실행 전 사용자 확인 및 승인
+- **🔧 로컬 실행**: 생성된 kubectl 명령을 로컬에서 직접 실행
+- **🔑 BYOK (Bring Your Own Key)**: 자신의 OpenAI API 키 사용
+- **⚡ 성능 측정**: LLM 응답 시간 및 전체 실행 시간 표시
+- **📜 세션 히스토리**: 대화 내역 자동 저장
 
 ## 📋 요구사항
 
-- Python 3.14 이상
-- 실행 중인 3개의 마이크로서비스:
-  - **LLM 서비스**: 자연어 분석 엔드포인트 (`POST /analyze`)
-  - **Note 서비스**: 파일 생성 엔드포인트 (`POST /notes`)
-  - **Task 서비스**: 명령어 실행 엔드포인트 (`POST /tasks/execute`)
+- kubectl 설치 및 클러스터 연결 설정
+- AKLP 백엔드 서비스 실행 → [배포 가이드](https://github.com/next-gen-dist-sys/aklp-infra/tree/main/k8s)
 
 ## 🚀 설치 방법
 
-### 1. 저장소 클론
+### 방법 1: 바이너리 설치 (권장)
+
+설치 스크립트를 사용하면 OS와 아키텍처에 맞는 바이너리를 자동으로 다운로드합니다.
+
+```bash
+curl -sSL https://raw.githubusercontent.com/next-gen-dist-sys/aklp-cli/main/install.sh | sh
+```
+
+**수동 다운로드:**
+
+[GitHub Releases](https://github.com/next-gen-dist-sys/aklp-cli/releases)에서 플랫폼에 맞는 바이너리를 직접 다운로드할 수 있습니다.
+
+| Platform            | Asset                  |
+| ------------------- | ---------------------- |
+| Linux x64           | `aklp-linux-x64`       |
+| macOS Intel         | `aklp-macos-x64`       |
+| macOS Apple Silicon | `aklp-macos-arm64`     |
+| Windows x64         | `aklp-windows-x64.exe` |
+
+**삭제:**
+
+```bash
+curl -sSL https://raw.githubusercontent.com/next-gen-dist-sys/aklp-cli/main/install.sh | sh -s uninstall
+```
+
+### 방법 2: 소스에서 설치 (개발용)
 
 ```bash
 git clone https://github.com/next-gen-dist-sys/aklp-cli.git
 cd aklp-cli
+uv sync
+uv run aklp
 ```
 
-### 2. 의존성 설치
+## ⚙️ 초기 설정
 
-**uv 사용 (권장):**
+처음 `aklp`를 실행하면 자동으로 설정 마법사가 시작됩니다:
 
-```bash
-uv pip install -e .
-```
+1. **클러스터 호스트**: AKLP 서비스가 실행 중인 클러스터 IP 또는 호스트명
+2. **OpenAI API Key**: AI 기능을 위한 API 키
 
-**pip 사용:**
+설정은 `~/.aklp/config.toml`에 안전하게 저장됩니다.
 
-```bash
-pip install -e .
-```
+```toml
+# ~/.aklp/config.toml 예시
+[cluster]
+host = "192.168.1.100"
 
-### 3. 환경 설정
-
-```bash
-cp .env.example .env
-```
-
-`.env` 파일을 열어 서비스 URL을 설정하세요:
-
-```env
-LLM_SERVICE_URL=http://localhost:8001
-NOTE_SERVICE_URL=http://localhost:8002
-TASK_SERVICE_URL=http://localhost:8003
+[openai]
+api_key = "sk-..."
 ```
 
 ## 💻 사용 방법
 
 ### 대화형 모드 (기본)
 
-인자 없이 실행하면 대화형 REPL 모드로 시작합니다:
-
 ```bash
 aklp
 ```
 
-**실행 화면:**
-
-```text
-┌──────────────────────────────────────────┐
-│      ✨ AKLP Interactive Mode ✨        │
-│                                          │
-│     자연어로 작업을 요청하세요.           │
-│                                          │
-│          💡 명령어                       │
-│        /help      도움말 보기            │
-│        /history   세션 히스토리 보기     │
-│        /clear     히스토리 초기화        │
-│        /exit      종료                   │
-└──────────────────────────────────────────┘
-             Ctrl+D로 빠른 종료
-
-❯ 현재 폴더에 README.md 만들고 ls -al 실행해줘
-[AI가 분석 중...]
-
-✨ 프로젝트 초기화 ✨
-[분석 결과 표시]
-
-🤔 위 작업을 진행하시겠습니까? (y/n): y
-
-✓ 파일 생성 완료: README.md
-✓ 명령어 실행 성공
-
-────────────────────────────────────────
-
-❯ /history
-[히스토리 테이블 표시]
-
-❯ /exit
-👋 Goodbye! 다음에 또 만나요!
-```
-
-### 단일 실행 모드
-
-프롬프트와 함께 실행하면 한 번만 실행하고 종료합니다:
-
-```bash
-aklp "현재 폴더에 README.md 만들고 ls -al 실행해줘"
-```
-
 ### 사용 예시
 
-**파일 생성:**
-
 ```bash
-❯ main.py 파일에 Hello World 함수 만들어줘
+❯ 모든 네임스페이스의 파드 목록 보여줘
+
+🤖 Agent 응답
+┌──────────────────────────────────────────────────────────────┐
+│ 모든 네임스페이스의 파드 목록 조회                              │
+├──────────────────────────────────────────────────────────────┤
+│ 📋 명령어: kubectl get pods --all-namespaces                  │
+│ 💡 이유: 모든 네임스페이스에서 실행 중인 파드 확인               │
+└──────────────────────────────────────────────────────────────┘
+  LLM 응답 시간: 1.23초
+
+🤔 이 명령어를 실행할까요? (Y/n): y
+
+✅ kubectl 실행 결과
+NAMESPACE     NAME                        READY   STATUS    RESTARTS   AGE
+default       nginx-6799fc88d8-abc12      1/1     Running   0          2d
+kube-system   coredns-5d78c9869d-xyz34    1/1     Running   0          5d
+...
+
+작업 완료 (전체 3.45초 / LLM 1.23초)
 ```
 
-**프로젝트 초기화:**
+**더 많은 예시:**
 
 ```bash
-❯ Python 프로젝트 초기 구조 만들고 requirements.txt도 생성해줘
+❯ default 네임스페이스에 nginx 디플로이먼트 만들어줘
+❯ my-app 서비스 로그 보여줘
+❯ 노드 리소스 사용량 확인해줘
+❯ configmap 목록 조회하고 상세 내용도 보여줘
 ```
 
-**문서 작성:**
+## ⌨️ 명령어
 
-```bash
-❯ API 문서를 작성하고 마크다운 형식으로 저장해줘
-```
-
-## ⌨️ 특수 명령어
-
-대화형 모드에서 사용 가능한 명령어들:
-
-| 명령어     | 설명                           |
-| ---------- | ------------------------------ |
-| `/help`    | 도움말 표시                    |
-| `/history` | 현재 세션의 대화 히스토리 보기 |
-| `/clear`   | 히스토리 초기화                |
-| `/exit`    | REPL 모드 종료                 |
-| `/quit`    | REPL 모드 종료                 |
-| `Ctrl+D`   | 빠른 종료                      |
-| `Ctrl+C`   | 현재 작업 취소                 |
+| 명령어           | 설명               |
+| ---------------- | ------------------ |
+| `/help`          | 도움말 표시        |
+| `/history`       | 세션 히스토리 보기 |
+| `/clear`         | 히스토리 초기화    |
+| `/exit`, `/quit` | 종료               |
+| `Ctrl+D`         | 빠른 종료          |
+| `Ctrl+C`         | 현재 작업 취소     |
 
 ## 🔄 작업 흐름
 
-1. **입력**: 자연어로 작업 요청
-2. **분석**: AI가 요청을 분석하고 실행 계획 표시
-3. **확인**: 사용자가 분석 결과를 검토하고 승인/거부
-4. **실행**: 승인 시 파일 생성 → 명령어 실행 순서로 진행
-5. **결과**: 실행 결과(STDOUT/STDERR) 표시
-6. **히스토리**: 대화 내역 자동 저장
+```text
+1. 자연어 입력 → 2. AI가 kubectl 명령 생성 → 3. 사용자 확인 → 4. 로컬 실행 → 5. 결과 표시
+```
 
 ## 📁 프로젝트 구조
 
 ```text
 aklp-cli/
-├── pyproject.toml          # 프로젝트 설정 및 의존성
-├── .env.example            # 환경 변수 예시
-├── .gitignore              # Git 제외 파일
-├── README.md               # 프로젝트 문서
-└── src/aklp/
-    ├── __init__.py         # 패키지 초기화
-    ├── __main__.py         # 진입점 (python -m aklp)
-    ├── cli.py              # 메인 CLI 로직 (Typer)
-    ├── config.py           # 환경 설정 관리
-    ├── models.py           # Pydantic 데이터 모델
-    ├── history.py          # 세션 히스토리 관리
-    ├── services/           # 마이크로서비스 클라이언트
-    │   ├── __init__.py
-    │   ├── llm.py          # LLM 서비스 클라이언트
-    │   ├── note.py         # Note 서비스 클라이언트
-    │   └── task.py         # Task 서비스 클라이언트
-    └── ui/                 # Rich UI 컴포넌트
-        ├── __init__.py
-        └── display.py      # 터미널 UI 표시 함수
+├── src/aklp/
+│   ├── cli.py          # 메인 CLI (Typer)
+│   ├── config.py       # 설정 관리
+│   ├── executor.py     # kubectl 실행기
+│   ├── models.py       # Pydantic 모델
+│   ├── secrets.py      # 설정 파일 관리
+│   ├── history.py      # 세션 히스토리
+│   ├── services/       # API 클라이언트
+│   └── ui/             # Rich UI
+├── install.sh          # 설치 스크립트
+└── pyproject.toml
 ```
 
-## 💾 히스토리 저장
-
-- 각 세션의 대화 내역이 `~/.aklp_history.json`에 자동 저장됩니다
-- 최대 100개의 세션 히스토리를 유지합니다
-- 세션 종료 시 자동으로 저장됩니다
-- 저장되는 정보:
-  - 사용자 프롬프트
-  - AI 분석 결과
-  - 실행 여부
-  - 파일 생성 결과
-  - 명령어 실행 결과
-  - 오류 메시지
-
-## 🛠️ 개발 가이드
-
-### 개발 모드 실행
+## 🛠️ 개발
 
 ```bash
-python -m aklp
+# 개발 환경 설정
+uv sync
+
+# 실행
+uv run aklp
+
+# 린트 & 포맷
+uv run ruff check --fix
+uv run ruff format
 ```
-
-또는 프롬프트와 함께:
-
-```bash
-python -m aklp "테스트 작업"
-```
-
-### 코드 스타일
-
-프로젝트는 다음 도구들을 사용합니다:
-
-- **ruff**: 린팅 및 포맷팅
-- **mypy**: 타입 체크
-
-### 주요 의존성
-
-- `typer[all]` - CLI 프레임워크
-- `rich` - 터미널 UI
-- `httpx` - 비동기 HTTP 클라이언트
-- `pydantic` - 데이터 검증
-- `pydantic-settings` - 설정 관리
-- `python-dotenv` - 환경 변수 로딩
-
-## 🎨 UI 스타일 가이드
-
-모던하고 우아한 터미널 UI:
-
-- **색상 팔레트**: 부드러운 파스텔 톤 (Blue, Magenta, Cyan)
-- **타이포그래피**: 섹션별 명확한 구분, 적절한 여백
-- **아이콘**: 직관적인 이모지 사용 (✨, 📋, 📄, ⚡, ✓, ✗)
-- **레이아웃**: Panel과 Table 기반 구조화된 정보 표시
 
 ## 📄 라이선스
 
@@ -237,8 +167,4 @@ MIT License
 
 ## 🤝 기여하기
 
-기여를 환영합니다! 이슈를 등록하거나 풀 리퀘스트를 보내주세요.
-
-## 📞 문의
-
-문제가 발생하거나 질문이 있으시면 GitHub Issues를 이용해주세요.
+이슈를 등록하거나 풀 리퀘스트를 보내주세요.
