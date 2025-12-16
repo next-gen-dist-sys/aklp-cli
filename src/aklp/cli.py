@@ -128,6 +128,7 @@ async def process_user_request(
 
         # Step 3: Display Agent result
         display_agent_result(agent_response)
+        console.print(f"[dim]  LLM 응답 시간: {turn.llm_elapsed_time:.2f}초[/dim]")
 
         # Check if agent returned an error
         if not agent_response.success:
