@@ -17,6 +17,12 @@ from aklp.commands.note import note_app
 from aklp.commands.task import task_app
 from aklp.commands.usage import usage_app
 from aklp.config import get_settings
+from aklp.executor import (
+    InvalidCommandError,
+    get_kubeconfig_hint,
+    run_kubectl,
+    validate_kubectl_command,
+)
 from aklp.history import HistoryManager
 from aklp.models import AgentResponse, ConversationTurn, UsageStats
 from aklp.services.agent import AgentServiceError, execute_command
@@ -40,6 +46,7 @@ from aklp.ui.display import (
     display_help,
     display_history,
     display_history_cleared,
+    display_kubectl_result,
     display_note_detail,
     display_notes_list,
     display_task_detail,
@@ -134,7 +141,42 @@ async def process_user_request(
 
         turn.executed = True
 
-        # Step 5: Create Note and Task
+        # Step 5: Validate and execute kubectl command
+        kubectl_result = None
+        execution_log = ""
+
+        if agent_response.command:
+            try:
+                validate_kubectl_command(agent_response.command)
+
+                with console.status(
+                    "[bold green]kubectl 명령어 실행 중...[/bold green]",
+                    spinner="dots",
+                ):
+                    kubectl_result = run_kubectl(agent_response.command)
+
+                # Display kubectl result
+                display_kubectl_result(
+                    success=kubectl_result.success,
+                    stdout=kubectl_result.stdout,
+                    stderr=kubectl_result.stderr,
+                    return_code=kubectl_result.return_code,
+                    kubeconfig_hint=get_kubeconfig_hint() if not kubectl_result.success else None,
+                )
+
+                # Build execution log for Note
+                if kubectl_result.stdout:
+                    execution_log += f"\n\n## 실행 결과\n```\n{kubectl_result.stdout}\n```"
+                if kubectl_result.stderr:
+                    execution_log += f"\n\n## 오류 출력\n```\n{kubectl_result.stderr}\n```"
+                execution_log += f"\n\n**Exit Code:** {kubectl_result.return_code}"
+
+            except InvalidCommandError as e:
+                display_error(str(e))
+                turn.error = str(e)
+                return turn
+
+        # Step 6: Create Note and Task
         note_response = None
         task_response = None
 
@@ -143,11 +185,12 @@ async def process_user_request(
             TextColumn("[progress.description]{task.description}"),
             console=console,
         ) as progress:
-            # Create Note
+            # Create Note with execution result
             note_task = progress.add_task("노트 생성 중...", total=1)
+            note_content = f"## 명령어\n```bash\n{agent_response.command}\n```\n\n## 설명\n{agent_response.reason or ''}{execution_log}"
             note_response = await create_note(
                 title=agent_response.title or "Agent 결과",
-                content=f"## 명령어\n```bash\n{agent_response.command}\n```\n\n## 설명\n{agent_response.reason or ''}",
+                content=note_content,
             )
             progress.update(note_task, completed=1)
             turn.note_response = note_response
@@ -161,7 +204,7 @@ async def process_user_request(
             progress.update(task_task, completed=1)
             turn.task_response = task_response
 
-        # Step 6: Display results
+        # Step 7: Display Note/Task creation results
         display_execution_result(note_response, task_response)
 
     except AgentServiceError as e:
