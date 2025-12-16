@@ -266,7 +266,7 @@ def confirm_execution() -> bool:
     console.print()
     return Confirm.ask(
         f"[{COLORS['warning']}]🤔 위 작업을 진행하시겠습니까?[/{COLORS['warning']}]",
-        default=False,
+        default=True,
     )
 
 
@@ -338,6 +338,73 @@ def display_task_result(result: LegacyTaskResponse) -> None:
             f"  [{COLORS['error']}]✗ 명령어 실행 실패[/{COLORS['error']}] "
             f"[{COLORS['muted']}](Exit Code: {result.exit_code})[/{COLORS['muted']}]"
         )
+
+
+def display_kubectl_result(
+    success: bool,
+    stdout: str,
+    stderr: str,
+    return_code: int,
+    kubeconfig_hint: str | None = None,
+) -> None:
+    """Display kubectl command execution result.
+
+    Args:
+        success: Whether the command succeeded
+        stdout: Standard output from command
+        stderr: Standard error from command
+        return_code: Command return code
+        kubeconfig_hint: Optional hint about KUBECONFIG setup (shown on failure)
+    """
+    console.print()
+
+    if stdout:
+        console.print(
+            Panel(
+                stdout.strip(),
+                title=f"[{COLORS['success']}]📤 실행 결과[/{COLORS['success']}]",
+                title_align="left",
+                border_style=COLORS["success"],
+                padding=(1, 2),
+            )
+        )
+        console.print()
+
+    if stderr:
+        console.print(
+            Panel(
+                stderr.strip(),
+                title=f"[{COLORS['error']}]📥 오류 출력[/{COLORS['error']}]",
+                title_align="left",
+                border_style=COLORS["error"],
+                padding=(1, 2),
+            )
+        )
+        console.print()
+
+    if success:
+        console.print(
+            f"  [{COLORS['success']}]✓ kubectl 명령어 실행 성공[/{COLORS['success']}] "
+            f"[{COLORS['muted']}](Exit Code: {return_code})[/{COLORS['muted']}]"
+        )
+    else:
+        console.print(
+            f"  [{COLORS['error']}]✗ kubectl 명령어 실행 실패[/{COLORS['error']}] "
+            f"[{COLORS['muted']}](Exit Code: {return_code})[/{COLORS['muted']}]"
+        )
+
+        # Show KUBECONFIG hint on failure
+        if kubeconfig_hint:
+            console.print()
+            console.print(
+                Panel(
+                    kubeconfig_hint,
+                    title=f"[{COLORS['info']}]💡 설정 안내[/{COLORS['info']}]",
+                    title_align="left",
+                    border_style=COLORS["info"],
+                    padding=(1, 2),
+                )
+            )
 
 
 def display_completion_message(elapsed_time: float) -> None:
