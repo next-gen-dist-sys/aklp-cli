@@ -266,7 +266,7 @@ def confirm_execution() -> bool:
     console.print()
     return Confirm.ask(
         f"[{COLORS['warning']}]🤔 위 작업을 진행하시겠습니까?[/{COLORS['warning']}]",
-        default=False,
+        default=True,
     )
 
 
