@@ -24,11 +24,116 @@ jobs:
         with:
           release-type: python
 
-      # Log release info (for debugging)
       - name: Release Info
         if: ${{ steps.release.outputs.release_created }}
         run: |
           echo "Release created: ${{ steps.release.outputs.tag_name }}"
           echo "Version: ${{ steps.release.outputs.version }}"
-          echo ""
-          echo "Build workflow will be triggered automatically by tag push."
+
+  # Build binaries when release is created
+  build:
+    name: Build ${{ matrix.target }}
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: linux-x64
+            binary_name: aklp
+            asset_name: aklp-linux-x64
+          - os: macos-15
+            target: macos-x64
+            binary_name: aklp
+            asset_name: aklp-macos-x64
+          - os: macos-latest
+            target: macos-arm64
+            binary_name: aklp
+            asset_name: aklp-macos-arm64
+          - os: windows-latest
+            target: windows-x64
+            binary_name: aklp.exe
+            asset_name: aklp-windows-x64.exe
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release-please.outputs.tag_name }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        shell: bash
+        run: |
+          uv sync
+          uv pip install pyinstaller
+
+      - name: Build binary with PyInstaller
+        shell: bash
+        run: |
+          uv run pyinstaller \
+            --onefile \
+            --name ${{ matrix.binary_name }} \
+            --clean \
+            --noconfirm \
+            src/aklp/cli.py
+
+      - name: Rename binary
+        shell: bash
+        run: |
+          mv dist/${{ matrix.binary_name }} dist/${{ matrix.asset_name }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset_name }}
+          path: dist/${{ matrix.asset_name }}
+          if-no-files-found: error
+
+  # Upload binaries to release
+  upload:
+    name: Upload to Release
+    needs: [release-please, build]
+    if: ${{ needs.release-please.outputs.release_created }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Display structure
+        run: ls -R artifacts
+
+      - name: Create checksums
+        run: |
+          cd artifacts
+          for dir in */; do
+            cd "$dir"
+            for file in *; do
+              sha256sum "$file" >> ../checksums.txt
+            done
+            cd ..
+          done
+          cat checksums.txt
+
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.release-please.outputs.tag_name }}
+          files: |
+            artifacts/aklp-linux-x64/aklp-linux-x64
+            artifacts/aklp-macos-x64/aklp-macos-x64
+            artifacts/aklp-macos-arm64/aklp-macos-arm64
+            artifacts/aklp-windows-x64.exe/aklp-windows-x64.exe
+            artifacts/checksums.txt
+          fail_on_unmatched_files: true
