@@ -117,12 +117,14 @@ async def process_user_request(
     turn = ConversationTurn(user_prompt=prompt)
 
     try:
-        # Step 1-2: Call Agent service
+        # Step 1-2: Call Agent service (measure LLM time)
+        llm_start_time = time.time()
         with console.status(
             "[bold green]Agent가 요청을 분석하고 있습니다...[/bold green]",
             spinner="dots",
         ):
             agent_response: AgentResponse = await execute_command(prompt)
+        turn.llm_elapsed_time = time.time() - llm_start_time
 
         # Step 3: Display Agent result
         display_agent_result(agent_response)
