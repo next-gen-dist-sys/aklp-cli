@@ -382,6 +382,7 @@ class ConversationTurn(BaseModel):
     note_response: NoteResponse | None = Field(None, description="Note service response")
     task_response: TaskResponse | None = Field(None, description="Task service response")
     error: str | None = Field(None, description="Error message if any")
+    llm_elapsed_time: float | None = Field(None, description="LLM response time in seconds")
 
 
 class SessionHistory(BaseModel):
