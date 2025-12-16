@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.0](https://github.com/next-gen-dist-sys/aklp-cli/compare/v0.1.0...v0.2.0) (2025-12-16)
+
+
+### Features
+
+* LLM 응답 시간 별도 측정 및 표시 ([#5](https://github.com/next-gen-dist-sys/aklp-cli/issues/5)) ([8c4abe5](https://github.com/next-gen-dist-sys/aklp-cli/commit/8c4abe556ee34e69bdc3a275999ebdb6f9bfe5b3))
+
 ## 0.1.0 (2025-12-16)
 
 
