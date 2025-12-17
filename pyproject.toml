@@ -1,6 +1,6 @@
 [project]
 name = "aklp"
-version = "0.2.1"
+version = "0.2.2"
 description = "FastAPI MSA-based CLI Agent for automated task execution"
 readme = "README.md"
 requires-python = ">=3.14"
