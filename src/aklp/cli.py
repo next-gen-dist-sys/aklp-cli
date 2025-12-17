@@ -114,7 +114,7 @@ async def process_user_request(
     Returns:
         ConversationTurn: Record of this conversation turn
     """
-    turn = ConversationTurn(user_prompt=prompt)
+    turn = ConversationTurn(user_prompt=prompt) # type: ignore
 
     try:
         # Step 1-2: Call Agent service (measure LLM time)
